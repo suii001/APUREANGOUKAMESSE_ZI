@@ -1,0 +1,427 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Бункер - Secure End-to-End Encrypted Chat</title>
+  <style>
+    :root {
+      --bg-dark: #100505;
+      --bg-panel: #1b0a0a;
+      --bg-msg: #2a0f0f;
+      --accent-red: #8b0000;
+      --text-main: #f0f0f0;
+      --text-muted: #a08080;
+      --border-color: #3d1414;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background-color: var(--bg-dark);
+      color: var(--text-main);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+      padding: 12px;
+      -webkit-user-select: text;
+      -moz-user-select: text;
+      -ms-user-select: text;
+      user-select: text;
+      -webkit-touch-callout: none;
+    }
+
+    .chat-container {
+      background-color: var(--bg-panel);
+      width: 100%;
+      max-width: 500px;
+      height: 90vh;
+      display: flex;
+      flex-direction: column;
+      border-radius: 12px;
+      border: 1px solid var(--border-color);
+      overflow: hidden;
+    }
+
+    .chat-header {
+      padding: 16px;
+      background-color: var(--bg-dark);
+      border-bottom: 1px solid var(--border-color);
+      font-weight: bold;
+      text-align: center;
+      color: #ff4d4d;
+      font-size: 14px;
+      user-select: none;
+      letter-spacing: 1px;
+    }
+
+    .chat-messages {
+      flex: 1;
+      padding: 16px;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    .message-item {
+      display: flex;
+      gap: 12px;
+      align-items: flex-start;
+    }
+
+    .avatar {
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+      background-color: var(--accent-red);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: bold;
+      flex-shrink: 0;
+    }
+
+    .message-content { flex: 1; }
+
+    .message-meta {
+      display: flex;
+      align-items: baseline;
+      gap: 8px;
+      margin-bottom: 4px;
+    }
+
+    .username {
+      font-weight: bold;
+      font-size: 14px;
+      color: #ff8080;
+    }
+
+    .timestamp {
+      font-size: 11px;
+      color: var(--text-muted);
+    }
+
+    .message-body {
+      background-color: var(--bg-msg);
+      padding: 10px 14px;
+      border-radius: 8px;
+      font-size: 14px;
+      line-height: 1.4;
+      white-space: pre-wrap;
+      word-break: break-all;
+      border: 1px solid var(--border-color);
+    }
+
+    .chat-input-area {
+      padding: 12px;
+      background-color: var(--bg-dark);
+      border-top: 1px solid var(--border-color);
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .input-row {
+      display: flex;
+      gap: 8px;
+    }
+
+    input, textarea, button {
+      width: 100%;
+      background-color: var(--bg-panel);
+      border: 1px solid var(--border-color);
+      color: var(--text-main);
+      padding: 10px;
+      border-radius: 6px;
+      font-size: 13px;
+      outline: none;
+    }
+
+    textarea { height: 60px; resize: none; }
+
+    button {
+      background-color: var(--accent-red);
+      font-weight: bold;
+      cursor: pointer;
+      transition: opacity 0.2s;
+    }
+
+    button:hover { opacity: 0.8; }
+    button:disabled { opacity: 0.5; cursor: not-allowed; }
+  </style>
+
+  <!-- Firebase SDK Compat v9.22.2 -->
+  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-database-compat.js"></script>
+</head>
+<body>
+
+  <div class="chat-container">
+    <div class="chat-header">
+      Бункер (Bunker) - E2EE Chat
+    </div>
+
+    <div class="chat-messages" id="message-list">
+      <div style="text-align: center; color: var(--text-muted); font-size: 12px; padding: 20px;">
+        ルームIDとパスワードを入力すると暗号化メッセージが表示されます。
+      </div>
+    </div>
+
+    <div class="chat-input-area">
+      <div class="input-row">
+        <input type="text" id="room-id" placeholder="ルームID" value="Nhabaka" style="flex: 1;">
+        <input type="text" id="user-input" placeholder="ユーザー名" style="flex: 1;">
+      </div>
+      <input type="password" id="secret-key" placeholder="共通パスワード (必須)">
+      <textarea id="msg-input" placeholder="暗号化メッセージを入力..."></textarea>
+      <button id="send-btn" onclick="sendMessage()">送信 (AES-GCM 256)</button>
+    </div>
+  </div>
+
+  <script>
+    const firebaseConfig = {
+      apiKey: "YOUR_API_KEY",
+      authDomain: "apure-chat-9e687.firebaseapp.com",
+      databaseURL: "https://apure-chat-9e687-default-rtdb.asia-southeast1.firebasedatabase.app",
+      projectId: "apure-chat-9e687",
+      storageBucket: "apure-chat-9e687.appspot.com",
+      messagingSenderId: "YOUR_SENDER_ID",
+      appId: "YOUR_APP_ID"
+    };
+
+    let db, messagesRef;
+    let currentRoomId = '';
+    let latestSnapshot = null;
+    let isSending = false; // 重複送信ガードフラグ
+
+    try {
+      firebase.initializeApp(firebaseConfig);
+      db = firebase.database();
+    } catch (e) {
+      console.error("Firebase Init Error:", e);
+    }
+
+    // -----------------------------------------------------------
+    // 暗号化・鍵導出 (Web Crypto API)
+    // -----------------------------------------------------------
+    async function getKeyMaterial(password, roomId) {
+      const enc = new TextEncoder();
+      const combinedSecret = `${password}::${roomId}`;
+      return window.crypto.subtle.importKey(
+        "raw",
+        enc.encode(combinedSecret),
+        "PBKDF2",
+        false,
+        ["deriveKey"]
+      );
+    }
+
+    async function deriveKey(keyMaterial, salt) {
+      return window.crypto.subtle.deriveKey(
+        {
+          name: "PBKDF2",
+          salt: salt,
+          iterations: 300000,
+          hash: "SHA-256"
+        },
+        keyMaterial,
+        { name: "AES-GCM", length: 256 },
+        false,
+        ["encrypt", "decrypt"]
+      );
+    }
+
+    async function encryptText(text, password, roomId) {
+      const enc = new TextEncoder();
+      const salt = window.crypto.getRandomValues(new Uint8Array(16));
+      const iv = window.crypto.getRandomValues(new Uint8Array(12));
+
+      const keyMaterial = await getKeyMaterial(password, roomId);
+      const key = await deriveKey(keyMaterial, salt);
+
+      const encrypted = await window.crypto.subtle.encrypt(
+        { name: "AES-GCM", iv: iv },
+        key,
+        enc.encode(text)
+      );
+
+      const combined = new Uint8Array(salt.length + iv.length + encrypted.byteLength);
+      combined.set(salt, 0);
+      combined.set(iv, salt.length);
+      combined.set(new Uint8Array(encrypted), salt.length + iv.length);
+
+      return btoa(String.fromCharCode(...combined))
+        .replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+    }
+
+    async function decryptText(base64Data, password, roomId) {
+      const base64 = base64Data.replace(/-/g, '+').replace(/_/g, '/');
+      const str = atob(base64);
+      const data = Uint8Array.from(str, c => c.charCodeAt(0));
+
+      if (data.length < 28) throw new Error("Invalid payload size");
+
+      const salt = data.slice(0, 16);
+      const iv = data.slice(16, 28);
+      const ciphertext = data.slice(28);
+
+      const keyMaterial = await getKeyMaterial(password, roomId);
+      const key = await deriveKey(keyMaterial, salt);
+
+      const decrypted = await window.crypto.subtle.decrypt(
+        { name: "AES-GCM", iv: iv },
+        key,
+        ciphertext
+      );
+
+      const dec = new TextDecoder();
+      return dec.decode(decrypted);
+    }
+
+    // -----------------------------------------------------------
+    // ルーム接続・リスナー切替 (重複登録防止修正済み)
+    // -----------------------------------------------------------
+    function updateRoomSubscription() {
+      const roomIdInput = document.getElementById('room-id').value.trim() || 'default-room';
+
+      // 既存リスナーの解除
+      if (messagesRef) {
+        messagesRef.off();
+      }
+
+      currentRoomId = roomIdInput;
+      messagesRef = db.ref(`messages/${currentRoomId}`);
+      
+      // 新しいリスナーを1つだけ登録
+      messagesRef.on('value', (snapshot) => {
+        latestSnapshot = snapshot;
+        renderMessages(snapshot);
+      });
+    }
+
+    // -----------------------------------------------------------
+    // 送信処理 (連打防止ガバナンス修正済み)
+    // -----------------------------------------------------------
+    async function sendMessage() {
+      if (isSending) return; // 送信中なら処理しない
+
+      const userRaw = document.getElementById('user-input').value;
+      const text = document.getElementById('msg-input').value.trim();
+      const password = document.getElementById('secret-key').value;
+      const roomId = document.getElementById('room-id').value.trim() || 'default-room';
+      const sendBtn = document.getElementById('send-btn');
+
+      if (!password) {
+        alert("共通パスワードを入力してください。");
+        return;
+      }
+      if (!text) {
+        alert("メッセージを入力してください。");
+        return;
+      }
+
+      // ロック開始
+      isSending = true;
+      sendBtn.disabled = true;
+
+      try {
+        const now = new Date();
+        const timeStr = `${now.getHours().toString().padStart(2,'0')}:${now.getMinutes().toString().padStart(2,'0')}`;
+
+        const payload = JSON.stringify({
+          user: userRaw || 'Anonymous',
+          text: text,
+          time: timeStr
+        });
+
+        const encryptedPayload = await encryptText(payload, password, roomId);
+
+        await messagesRef.push({
+          ciphertext: encryptedPayload,
+          timestamp: firebase.database.ServerValue.TIMESTAMP
+        });
+
+        document.getElementById('msg-input').value = '';
+      } catch (e) {
+        alert("送信失敗: " + e.message);
+        console.error(e);
+      } finally {
+        // ロック解除
+        isSending = false;
+        sendBtn.disabled = false;
+      }
+    }
+
+    // -----------------------------------------------------------
+    // メッセージ描画
+    // -----------------------------------------------------------
+    async function renderMessages(snapshot) {
+      const container = document.getElementById('message-list');
+      const password = document.getElementById('secret-key').value;
+      const roomId = document.getElementById('room-id').value.trim() || 'default-room';
+
+      if (!snapshot || !snapshot.exists()) {
+        container.innerHTML = '<div style="text-align: center; color: var(--text-muted); font-size: 12px; padding: 20px;">メッセージはありません。</div>';
+        return;
+      }
+
+      const dataObj = snapshot.val();
+      container.innerHTML = '';
+
+      for (const id in dataObj) {
+        const item = dataObj[id];
+
+        if (password && item.ciphertext) {
+          try {
+            const jsonStr = await decryptText(item.ciphertext, password, roomId);
+            const msg = JSON.parse(jsonStr);
+
+            const msgEl = document.createElement('div');
+            msgEl.className = 'message-item';
+            const initial = msg.user ? msg.user.charAt(0).toUpperCase() : '?';
+
+            msgEl.innerHTML = `
+              <div class="avatar">${initial}</div>
+              <div class="message-content">
+                <div class="message-meta">
+                  <span class="username">${escapeHtml(msg.user)}</span>
+                  <span class="timestamp">${msg.time}</span>
+                </div>
+                <div class="message-body">${escapeHtml(msg.text)}</div>
+              </div>
+            `;
+            container.appendChild(msgEl);
+          } catch (e) {
+            // 解読不可な場合は非表示
+          }
+        }
+      }
+
+      if (!password) {
+        container.innerHTML = '<div style="text-align: center; color: var(--text-muted); font-size: 12px; padding: 20px;">共通パスワードを入力すると暗号化メッセージが復号されます。</div>';
+      }
+
+      container.scrollTop = container.scrollHeight;
+    }
+
+    function escapeHtml(str) {
+      return str.replace(/[&<>"']/g, m => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' }[m]));
+    }
+
+    // イベントリスナー設定
+    document.getElementById('secret-key').addEventListener('input', () => {
+      if (latestSnapshot) renderMessages(latestSnapshot);
+    });
+
+    document.getElementById('room-id').addEventListener('change', () => {
+      updateRoomSubscription();
+    });
+
+    // 初期化
+    updateRoomSubscription();
+  </script>
+</body>
+</html>
