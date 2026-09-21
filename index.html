@@ -1,0 +1,514 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>APURE Realtime Chat</title>
+  <style>
+    :root {
+      --bg-dark: #100505;
+      --bg-panel: #1b0a0a;
+      --bg-msg: #2a0f0f;
+      --accent-red: #8b0000;
+      --text-main: #f0f0f0;
+      --text-muted: #a08080;
+      --border-color: #3d1414;
+      --debug-bg: #050000;
+      --debug-green: #00ff66;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background-color: var(--bg-dark);
+      color: var(--text-main);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+      padding: 12px;
+      /* コピー許可、長押しメニュー・プレビューの抑制 */
+      -webkit-user-select: text;
+      -moz-user-select: text;
+      -ms-user-select: text;
+      user-select: text;
+      -webkit-touch-callout: none;
+    }
+
+    .chat-container {
+      background-color: var(--bg-panel);
+      width: 100%;
+      max-width: 500px;
+      height: 90vh;
+      display: flex;
+      flex-direction: column;
+      border-radius: 12px;
+      border: 1px solid var(--border-color);
+      overflow: hidden;
+    }
+
+    /* ヘッダーのクリック判定を削除（完全隠蔽） */
+    .chat-header {
+      padding: 16px;
+      background-color: var(--bg-dark);
+      border-bottom: 1px solid var(--border-color);
+      font-weight: bold;
+      text-align: center;
+      color: #ff4d4d;
+      font-size: 14px;
+      user-select: none;
+    }
+
+    /* デバッグパネル用スタイル */
+    .debug-panel {
+      display: none;
+      background-color: var(--debug-bg);
+      border-bottom: 2px solid var(--accent-red);
+      padding: 10px;
+      font-family: monospace;
+      font-size: 11px;
+      color: var(--debug-green);
+      max-height: 220px;
+      overflow-y: auto;
+    }
+
+    .debug-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      color: #ff8080;
+      font-weight: bold;
+      margin-bottom: 6px;
+      border-bottom: 1px dashed var(--border-color);
+      padding-bottom: 4px;
+    }
+
+    .debug-btn {
+      background: #330000;
+      border: 1px solid #8b0000;
+      color: #ff8080;
+      padding: 2px 6px;
+      font-size: 10px;
+      border-radius: 4px;
+      cursor: pointer;
+      width: auto;
+    }
+    .debug-btn:hover { background: #550000; }
+
+    .monitor-item {
+      background: #110505;
+      border: 1px solid #331111;
+      padding: 6px;
+      margin-bottom: 4px;
+      border-radius: 4px;
+      word-break: break-all;
+    }
+
+    .chat-messages {
+      flex: 1;
+      padding: 16px;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    .message-item {
+      display: flex;
+      gap: 12px;
+      align-items: flex-start;
+    }
+
+    .avatar {
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+      background-color: var(--accent-red);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: bold;
+      flex-shrink: 0;
+    }
+
+    .message-content { flex: 1; }
+
+    .message-meta {
+      display: flex;
+      align-items: baseline;
+      gap: 8px;
+      margin-bottom: 4px;
+    }
+
+    .username {
+      font-weight: bold;
+      font-size: 14px;
+      color: #ff8080;
+    }
+
+    .timestamp {
+      font-size: 11px;
+      color: var(--text-muted);
+    }
+
+    .message-body {
+      background-color: var(--bg-msg);
+      padding: 10px 14px;
+      border-radius: 8px;
+      font-size: 14px;
+      line-height: 1.4;
+      white-space: pre-wrap;
+      word-break: break-all;
+      border: 1px solid var(--border-color);
+    }
+
+    .chat-input-area {
+      padding: 12px;
+      background-color: var(--bg-dark);
+      border-top: 1px solid var(--border-color);
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    input, textarea, button {
+      width: 100%;
+      background-color: var(--bg-panel);
+      border: 1px solid var(--border-color);
+      color: var(--text-main);
+      padding: 10px;
+      border-radius: 6px;
+      font-size: 13px;
+      outline: none;
+    }
+
+    textarea { height: 60px; resize: none; }
+
+    button {
+      background-color: var(--accent-red);
+      font-weight: bold;
+      cursor: pointer;
+      transition: opacity 0.2s;
+    }
+
+    button:hover { opacity: 0.8; }
+    button:disabled { opacity: 0.5; cursor: not-allowed; }
+  </style>
+
+  <!-- Firebase SDK 読み込み -->
+  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-database-compat.js"></script>
+</head>
+<body>
+
+  <div class="chat-container">
+    <div class="chat-header" id="chat-header">
+      APURE Realtime Chat
+    </div>
+
+    <!-- デバッグ ＆ モニターパネル（初期非表示） -->
+    <div class="debug-panel" id="debug-panel">
+      <div class="debug-header">
+        <span>[ADMIN MONITOR & LOG]</span>
+        <div style="display: flex; gap: 4px;">
+          <button class="debug-btn" onclick="clearAllMessages()">DB全削除</button>
+          <button class="debug-btn" onclick="clearDebugLog()">クリア</button>
+        </div>
+      </div>
+      <div id="debug-monitor"></div>
+      <div id="debug-log" style="border-top: 1px dashed #3d1414; margin-top: 6px; padding-top: 6px;"></div>
+    </div>
+
+    <div class="chat-messages" id="message-list">
+      <div style="text-align: center; color: var(--text-muted); font-size: 12px; padding: 20px;">
+        共通パスワード（鍵）を入力するとメッセージが表示されます。
+      </div>
+    </div>
+
+    <div class="chat-input-area">
+      <div style="display: flex; gap: 8px;">
+        <input type="text" id="user-input" placeholder="ユーザー名" style="flex: 1;">
+        <input type="password" id="secret-key" placeholder="共通パスワード (必須)" style="flex: 1;">
+      </div>
+      <textarea id="msg-input" placeholder="メッセージを入力..."></textarea>
+      <button id="send-btn" onclick="sendMessage()">送信</button>
+    </div>
+  </div>
+
+  <script>
+    // -----------------------------------------------------------
+    // デバッグログ ＆ モニター関数
+    // -----------------------------------------------------------
+    function logDebug(msg, type = 'info') {
+      const logArea = document.getElementById('debug-log');
+      const now = new Date();
+      const timeStr = `${now.getHours().toString().padStart(2,'0')}:${now.getMinutes().toString().padStart(2,'0')}:${now.getSeconds().toString().padStart(2,'0')}`;
+      
+      let prefix = "[INFO]";
+      let color = "var(--debug-green)";
+      if (type === 'error') { prefix = "[ERR]"; color = "#ff4d4d"; }
+      if (type === 'warn')  { prefix = "[WARN]"; color = "#ffcc00"; }
+
+      const line = document.createElement('div');
+      line.style.color = color;
+      line.textContent = `${timeStr} ${prefix} ${msg}`;
+      logArea.appendChild(line);
+      
+      const panel = document.getElementById('debug-panel');
+      panel.scrollTop = panel.scrollHeight;
+    }
+
+    function clearDebugLog() {
+      document.getElementById('debug-log').innerHTML = '';
+    }
+
+    async function clearAllMessages() {
+      if (confirm("データベース内の全メッセージを削除しますか？")) {
+        if (messagesRef) {
+          await messagesRef.remove();
+          logDebug("All DB messages purged by Admin.", 'warn');
+        }
+      }
+    }
+
+    // -----------------------------------------------------------
+    // Firebase設定（※Firebase Consoleから取得した値をセットしてください）
+    // -----------------------------------------------------------
+    const firebaseConfig = {
+      apiKey: "AIzaSy...", // Firebase Console のプロジェクト設定から取得したWeb APIキー
+      authDomain: "apure-chat-9e687.firebaseapp.com",
+      databaseURL: "https://apure-chat-9e687-default-rtdb.asia-southeast1.firebasedatabase.app",
+      projectId: "apure-chat-9e687",
+      storageBucket: "apure-chat-9e687.appspot.com",
+      messagingSenderId: "123456789000", // Firebase Console から取得した送信者ID
+      appId: "1:123456789000:web:abcdef1234567890" // Firebase Console から取得したApp ID
+    };
+
+    let db, messagesRef;
+    try {
+      firebase.initializeApp(firebaseConfig);
+      db = firebase.database();
+      messagesRef = db.ref('chat_messages');
+      logDebug("Firebase initialized.");
+    } catch (e) {
+      logDebug("Init error: " + e.message, 'error');
+    }
+
+    const EXPIRE_MS = 2 * 60 * 60 * 1000;
+    let latestSnapshot = null; // パスワード変更時の即時再描画用キャッシュ
+
+    // -----------------------------------------------------------
+    // 暗号化 / 復号化（Web Crypto API）
+    // -----------------------------------------------------------
+    async function getKeyMaterial(password) {
+      const enc = new TextEncoder();
+      return window.crypto.subtle.importKey("raw", enc.encode(password), "PBKDF2", false, ["deriveKey"]);
+    }
+
+    async function deriveKey(keyMaterial, salt) {
+      return window.crypto.subtle.deriveKey(
+        { name: "PBKDF2", salt: salt, iterations: 100000, hash: "SHA-256" },
+        keyMaterial,
+        { name: "AES-GCM", length: 256 },
+        false,
+        ["encrypt", "decrypt"]
+      );
+    }
+
+    async function encryptText(text, password) {
+      const enc = new TextEncoder();
+      const salt = window.crypto.getRandomValues(new Uint8Array(16));
+      const iv = window.crypto.getRandomValues(new Uint8Array(12));
+
+      const keyMaterial = await getKeyMaterial(password);
+      const key = await deriveKey(keyMaterial, salt);
+
+      const encrypted = await window.crypto.subtle.encrypt(
+        { name: "AES-GCM", iv: iv },
+        key,
+        enc.encode(text)
+      );
+
+      const combined = new Uint8Array(salt.length + iv.length + encrypted.byteLength);
+      combined.set(salt, 0);
+      combined.set(iv, salt.length);
+      combined.set(new Uint8Array(encrypted), salt.length + iv.length);
+
+      return btoa(String.fromCharCode(...combined))
+        .replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+    }
+
+    async function decryptText(base64Data, password) {
+      const base64 = base64Data.replace(/-/g, '+').replace(/_/g, '/');
+      const str = atob(base64);
+      const data = Uint8Array.from(str, c => c.charCodeAt(0));
+
+      const salt = data.slice(0, 16);
+      const iv = data.slice(16, 28);
+      const ciphertext = data.slice(28);
+
+      const keyMaterial = await getKeyMaterial(password);
+      const key = await deriveKey(keyMaterial, salt);
+
+      const decrypted = await window.crypto.subtle.decrypt(
+        { name: "AES-GCM", iv: iv },
+        key,
+        ciphertext
+      );
+
+      const dec = new TextDecoder();
+      return dec.decode(decrypted);
+    }
+
+    // -----------------------------------------------------------
+    // 送信処理（隠しトリガー判定）
+    // -----------------------------------------------------------
+    async function sendMessage() {
+      const userRaw = document.getElementById('user-input').value;
+      const text = document.getElementById('msg-input').value.trim();
+      const password = document.getElementById('secret-key').value;
+      const sendBtn = document.getElementById('send-btn');
+
+      // 隠しトリガーコマンド判定（ユーザー名・パスワードが空、メッセージが指定文字列）
+      if (!userRaw.trim() && !password && text === "Вместе с коллегой-администратором СУИИ") {
+        document.getElementById('debug-panel').style.display = 'block';
+        logDebug("[ADMIN DEBUG MODE ACTIVATED]", 'warn');
+        document.getElementById('msg-input').value = '';
+        return;
+      }
+
+      const user = userRaw || 'Anonymous';
+
+      if (!password) {
+        alert("共通パスワード（鍵）を入力してください。");
+        return;
+      }
+
+      if (!text) {
+        alert("メッセージを入力してください。");
+        return;
+      }
+
+      sendBtn.disabled = true;
+
+      try {
+        const now = new Date();
+        const timeStr = `${now.getHours().toString().padStart(2,'0')}:${now.getMinutes().toString().padStart(2,'0')}`;
+
+        const payload = JSON.stringify({
+          user,
+          text,
+          time: timeStr,
+          createdAt: now.getTime()
+        });
+
+        const encryptedPayload = await encryptText(payload, password);
+
+        await messagesRef.push({
+          data: encryptedPayload,
+          timestamp: now.getTime()
+        });
+
+        document.getElementById('msg-input').value = '';
+      } catch (e) {
+        alert("送信エラー: " + e.message);
+      } finally {
+        sendBtn.disabled = false;
+      }
+    }
+
+    // -----------------------------------------------------------
+    // メッセージ描画処理
+    // -----------------------------------------------------------
+    async function renderMessages(snapshot) {
+      if (!snapshot) return;
+      latestSnapshot = snapshot;
+
+      const container = document.getElementById('message-list');
+      const monitorArea = document.getElementById('debug-monitor');
+      const password = document.getElementById('secret-key').value;
+
+      const dataObj = snapshot.val();
+      
+      monitorArea.innerHTML = '<div style="color:#888; font-size:10px;">[REALTIME DB MONITOR]</div>';
+
+      if (!dataObj) {
+        container.innerHTML = '<div style="text-align: center; color: var(--text-muted); font-size: 12px; padding: 20px;">メッセージはまだありません。</div>';
+        monitorArea.innerHTML += '<div style="color:#666;">DB is empty.</div>';
+        return;
+      }
+
+      container.innerHTML = '';
+      const now = Date.now();
+
+      for (const id in dataObj) {
+        const item = dataObj[id];
+
+        // 2時間経過したデータを自動削除
+        if (now - item.timestamp > EXPIRE_MS) {
+          messagesRef.child(id).remove();
+          continue;
+        }
+
+        // --- 1. 安全化されたデバッグモニター（暗号化文字列のみ出力・slice使用） ---
+        const mItem = document.createElement('div');
+        mItem.className = 'monitor-item';
+        mItem.innerHTML = `<span style="color:#888;">[ID:${id.slice(-4)}]</span> <span style="color:#666;">[ENCRYPTED] ${item.data.slice(0, 24)}...</span>`;
+        monitorArea.appendChild(mItem);
+
+        // --- 2. メインチャット画面の復号・描画 ---
+        if (password) {
+          try {
+            const jsonStr = await decryptText(item.data, password);
+            const msg = JSON.parse(jsonStr);
+
+            const msgEl = document.createElement('div');
+            msgEl.className = 'message-item';
+            const initial = msg.user ? msg.user.charAt(0).toUpperCase() : '?';
+
+            msgEl.innerHTML = `
+              <div class="avatar">${initial}</div>
+              <div class="message-content">
+                <div class="message-meta">
+                  <span class="username">${escapeHtml(msg.user)}</span>
+                  <span class="timestamp">${msg.time}</span>
+                </div>
+                <div class="message-body">${escapeHtml(msg.text)}</div>
+              </div>
+            `;
+            container.appendChild(msgEl);
+          } catch (e) {
+            // パスワード不一致時は非表示（エラーを無視）
+          }
+        }
+      }
+
+      if (!password) {
+        container.innerHTML = '<div style="text-align: center; color: var(--text-muted); font-size: 12px; padding: 20px;">共通パスワード（鍵）を入力するとメッセージが表示されます。</div>';
+      }
+
+      container.scrollTop = container.scrollHeight;
+    }
+
+    // -----------------------------------------------------------
+    // リアルタイム受信・イベントリスナー設定
+    // -----------------------------------------------------------
+    function listenMessages() {
+      if (!messagesRef) return;
+      messagesRef.on('value', renderMessages);
+    }
+
+    // パスワード入力時、入力のたびに即座に復号表示をやり直す
+    document.getElementById('secret-key').addEventListener('input', () => {
+      if (latestSnapshot) renderMessages(latestSnapshot);
+    });
+
+    function escapeHtml(str) {
+      return str.replace(/[&<>"']/g, m => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' }[m]));
+    }
+
+    listenMessages();
+  </script>
+</body>
+</html>
