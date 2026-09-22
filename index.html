@@ -1,0 +1,683 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>Буンカー - E2EE Direct Message</title>
+
+  <!-- エラー検知デバッガー -->
+  <script>
+    window.onerror = function(message, source, lineno, colno, error) {
+      alert("【JS実行エラー】\n" + message + "\n(行: " + lineno + ")");
+      return false;
+    };
+  </script>
+
+  <style>
+    :root {
+      --bg-dark: #100505;
+      --bg-panel: #1b0a0a;
+      --bg-msg: #2a0f0f;
+      --accent-red: #8b0000;
+      --text-main: #f0f0f0;
+      --text-muted: #a08080;
+      --border-color: #3d1414;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    html {
+      height: 100%;
+    }
+
+    body {
+      min-height: 100%;
+      min-height: 100dvh;
+      background-color: var(--bg-dark);
+      color: var(--text-main);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+    }
+
+    .app-container {
+      background-color: var(--bg-panel);
+      width: 100%;
+      max-width: 850px;
+      height: 100dvh;
+      display: flex;
+      border: 1px solid var(--border-color);
+      overflow: hidden;
+      position: relative;
+    }
+
+    .sidebar {
+      width: 280px;
+      background-color: var(--bg-dark);
+      border-right: 1px solid var(--border-color);
+      display: flex;
+      flex-direction: column;
+      flex-shrink: 0;
+      height: 100%;
+    }
+
+    .user-profile-header {
+      padding: 12px;
+      border-bottom: 1px solid var(--border-color);
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      background-color: var(--bg-dark);
+    }
+
+    .my-name {
+      font-weight: bold;
+      color: #ff8080;
+      font-size: 13px;
+      word-break: break-all;
+    }
+
+    .add-dm-box {
+      display: flex;
+      gap: 6px;
+    }
+
+    .add-dm-box input {
+      flex: 1;
+      padding: 8px;
+      font-size: 12px;
+      min-width: 0;
+    }
+
+    .add-dm-box button {
+      padding: 8px 12px;
+      font-size: 12px;
+      white-space: nowrap;
+    }
+
+    .dm-list {
+      flex: 1;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .dm-item {
+      padding: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 1px solid #1a0808;
+      cursor: pointer;
+    }
+
+    .dm-item:hover, .dm-item.active {
+      background-color: #2a0c0c;
+    }
+
+    .dm-name {
+      font-size: 13px;
+      font-weight: bold;
+      color: var(--text-main);
+    }
+
+    .dm-del-btn {
+      background: none;
+      border: none;
+      color: var(--text-muted);
+      font-size: 14px;
+      padding: 2px 6px;
+      cursor: pointer;
+    }
+
+    .dm-del-btn:hover {
+      color: #ff4d4d;
+    }
+
+    .chat-main {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      background-color: var(--bg-panel);
+      background-image: linear-gradient(rgba(16, 5, 5, 0.78), rgba(16, 5, 5, 0.85)), url('1200.png');
+      background-position: center;
+      background-repeat: no-repeat;
+      background-size: cover;
+      min-width: 0;
+      height: 100%;
+      height: 100dvh;
+      position: relative;
+    }
+
+    .chat-header {
+      padding: 12px 16px;
+      background-color: rgba(16, 5, 5, 0.92);
+      backdrop-filter: blur(8px);
+      border-bottom: 1px solid var(--border-color);
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      color: #ff4d4d;
+      font-size: 14px;
+      font-weight: bold;
+      flex-shrink: 0;
+      z-index: 10;
+    }
+
+    .back-btn {
+      display: none;
+      background: none;
+      border: 1px solid var(--border-color);
+      color: var(--text-main);
+      padding: 4px 10px;
+      border-radius: 4px;
+      font-size: 12px;
+      cursor: pointer;
+      flex-shrink: 0;
+    }
+
+    .chat-messages {
+      flex: 1;
+      min-height: 0;
+      padding: 16px;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+
+    .message-item {
+      display: flex;
+      gap: 10px;
+      align-items: flex-start;
+    }
+
+    .avatar {
+      width: 34px;
+      height: 34px;
+      border-radius: 50%;
+      background-color: var(--accent-red);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: bold;
+      font-size: 13px;
+      flex-shrink: 0;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.5);
+    }
+
+    .message-content {
+      flex: 1;
+      min-width: 0;
+    }
+
+    .message-meta {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 4px;
+      font-size: 11px;
+    }
+
+    .username {
+      color: #ff8080;
+      font-weight: bold;
+    }
+
+    .timestamp {
+      color: var(--text-muted);
+    }
+
+    .message-body {
+      background-color: rgba(42, 15, 15, 0.92);
+      backdrop-filter: blur(4px);
+      padding: 8px 12px;
+      border-radius: 8px;
+      font-size: 13px;
+      line-height: 1.4;
+      word-break: break-all;
+      border: 1px solid var(--border-color);
+      display: inline-block;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.4);
+    }
+
+    .message-error {
+      background-color: rgba(61, 13, 13, 0.95);
+      border-color: #8b0000;
+      color: #ff8080;
+      font-size: 12px;
+    }
+
+    .chat-input-area {
+      padding: 10px 12px;
+      padding-bottom: calc(10px + env(safe-area-inset-bottom));
+      background-color: rgba(16, 5, 5, 0.95);
+      backdrop-filter: blur(8px);
+      border-top: 1px solid var(--border-color);
+      display: flex;
+      gap: 8px;
+      flex-shrink: 0;
+      position: sticky;
+      bottom: 0;
+      z-index: 10;
+    }
+
+    input, button, textarea {
+      background-color: rgba(27, 10, 10, 0.9);
+      border: 1px solid var(--border-color);
+      color: var(--text-main);
+      padding: 8px 10px;
+      border-radius: 6px;
+      font-size: 13px;
+      outline: none;
+    }
+
+    textarea {
+      flex: 1;
+      height: 42px;
+      resize: none;
+      font-family: inherit;
+    }
+
+    button {
+      background-color: var(--accent-red);
+      font-weight: bold;
+      cursor: pointer;
+      flex-shrink: 0;
+    }
+
+    button:disabled, textarea:disabled {
+      opacity: 0.4;
+      cursor: not-allowed;
+    }
+
+    .modal-overlay {
+      position: fixed;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(0, 0, 0, 0.85);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 1000;
+    }
+
+    .modal-box {
+      background-color: var(--bg-panel);
+      border: 1px solid var(--border-color);
+      padding: 24px;
+      border-radius: 12px;
+      width: 90%;
+      max-width: 360px;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+      text-align: center;
+    }
+
+    @media (max-width: 600px) {
+      .app-container { border: none; }
+      .sidebar { width: 100%; display: flex; }
+      .chat-main { display: none; width: 100%; }
+      .app-container.mobile-chat-active .sidebar { display: none; }
+      .app-container.mobile-chat-active .chat-main { display: flex; }
+      .back-btn { display: inline-block; }
+    }
+  </style>
+
+  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-database-compat.js"></script>
+</head>
+<body>
+
+  <!-- 初回ユーザー設定モーダル -->
+  <div id="login-modal" class="modal-overlay">
+    <div class="modal-box">
+      <h3 style="color: #ff4d4d;">ユーザー名を設定</h3>
+      <p style="font-size: 12px; color: var(--text-muted);">相手に教える固有のIDを入力してください</p>
+      <input type="text" id="my-username-input" placeholder="例: user_01">
+      <button type="button" id="login-btn" onclick="startLoginProcess()">チャット開始</button>
+    </div>
+  </div>
+
+  <div class="app-container" id="app-container">
+    <!-- サイドバー -->
+    <div class="sidebar">
+      <div class="user-profile-header">
+        <div class="my-name" id="my-name-display">ID: ---</div>
+        <div class="add-dm-box">
+          <input type="text" id="target-user-input" placeholder="相手のID">
+          <button type="button" id="add-dm-btn">追加</button>
+        </div>
+      </div>
+      <div class="dm-list" id="dm-list"></div>
+    </div>
+
+    <!-- チャットメイン領域 -->
+    <div class="chat-main">
+      <div class="chat-header">
+        <button class="back-btn" id="back-btn">← 戻る</button>
+        <span id="current-chat-title">DM相手を選択してください</span>
+      </div>
+
+      <div class="chat-messages" id="message-list">
+        <div style="text-align: center; color: var(--text-muted); font-size: 12px; padding: 20px;">
+          相手を追加してチャットを開始してください
+        </div>
+      </div>
+
+      <div class="chat-input-area">
+        <textarea id="msg-input" placeholder="メッセージを入力... (E2EE暗号化)" disabled></textarea>
+        <button id="send-btn" type="button" style="width: 70px;" disabled>送信</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    let db = null;
+    let myUsername = '';
+    let myKeyPair = null;
+    let activeTargetUser = null;
+    let activeSharedKey = null;
+    let currentDmRef = null;
+    let dmUsers = new Set();
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyBnVBvyE8pfFc4WUAbAtCJXScsWWRmhzwk",
+      authDomain: "apure-chat-9e687.firebaseapp.com",
+      databaseURL: "https://apure-chat-9e687-default-rtdb.asia-southeast1.firebasedatabase.app",
+      projectId: "apure-chat-9e687",
+      storageBucket: "apure-chat-9e687.firebasestorage.app",
+      messagingSenderId: "119464225734",
+      appId: "1:119464225734:web:593e59a957c9d6a669e0c7"
+    };
+
+    try {
+      if (typeof firebase !== 'undefined') {
+        firebase.initializeApp(firebaseConfig);
+        db = firebase.database();
+      }
+    } catch (e) {
+      console.error("Firebase Init Error:", e);
+    }
+
+    function withTimeout(promise, ms = 6000, errorMsg = "通信タイムアウト") {
+      return Promise.race([
+        promise,
+        new Promise((_, reject) => setTimeout(() => reject(new Error(errorMsg)), ms))
+      ]);
+    }
+
+    async function generateKeys() {
+      if (!window.crypto || !window.crypto.subtle) {
+        throw new Error("暗号化機能が非対応です。https環境で開いてください。");
+      }
+      return await window.crypto.subtle.generateKey({ name: "ECDH", namedCurve: "P-256" }, true, ["deriveKey"]);
+    }
+
+    async function exportKey(key, format) {
+      const exported = await window.crypto.subtle.exportKey(format, key);
+      return btoa(String.fromCharCode(...new Uint8Array(exported)));
+    }
+
+    async function importPublicKey(base64) {
+      const binary = Uint8Array.from(atob(base64), c => c.charCodeAt(0));
+      return await window.crypto.subtle.importKey("spki", binary, { name: "ECDH", namedCurve: "P-256" }, false, []);
+    }
+
+    async function importPrivateKey(base64) {
+      const binary = Uint8Array.from(atob(base64), c => c.charCodeAt(0));
+      return await window.crypto.subtle.importKey("pkcs8", binary, { name: "ECDH", namedCurve: "P-256" }, false, ["deriveKey"]);
+    }
+
+    async function deriveSharedKey(privKey, pubKey) {
+      return await window.crypto.subtle.deriveKey({ name: "ECDH", public: pubKey }, privKey, { name: "AES-GCM", length: 256 }, false, ["encrypt", "decrypt"]);
+    }
+
+    async function encryptText(text, key) {
+      const iv = window.crypto.getRandomValues(new Uint8Array(12));
+      const enc = await window.crypto.subtle.encrypt({ name: "AES-GCM", iv: iv }, key, new TextEncoder().encode(text));
+      const combined = new Uint8Array(12 + enc.byteLength);
+      combined.set(iv, 0); combined.set(new Uint8Array(enc), 12);
+      return btoa(String.fromCharCode(...combined));
+    }
+
+    async function decryptText(base64, key) {
+      const data = Uint8Array.from(atob(base64), c => c.charCodeAt(0));
+      const dec = await window.crypto.subtle.decrypt({ name: "AES-GCM", iv: data.slice(0, 12) }, key, data.slice(12));
+      return new TextDecoder().decode(dec);
+    }
+
+    function escapeHtml(str) {
+      return String(str).replace(/[&<>"']/g, m => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' }[m]));
+    }
+
+    // 直接グローバルに実行関数を紐付け
+    window.startLoginProcess = async function() {
+      const loginBtn = document.getElementById('login-btn');
+      const input = document.getElementById('my-username-input');
+      const val = input.value ? input.value.trim() : '';
+
+      if (!val) {
+        alert("ユーザー名を入力してください");
+        return;
+      }
+
+      if (/[.#$\[\]\/]/.test(val)) {
+        alert("ユーザー名に禁止文字 ( . # $ [ ] / ) は使用できません。");
+        return;
+      }
+
+      if (!db) {
+        alert("Databaseが初期化されていません。ページの再読み込みを試してください。");
+        return;
+      }
+
+      loginBtn.disabled = true;
+      loginBtn.textContent = "接続確認中...";
+
+      try {
+        const snap = await withTimeout(db.ref(`users/${val}`).once('value'));
+        if (snap.exists()) {
+          alert("このIDは既に使われています。別のIDを入力してください。");
+          loginBtn.disabled = false;
+          loginBtn.textContent = "チャット開始";
+          return;
+        }
+
+        loginBtn.textContent = "鍵生成中...";
+        myKeyPair = await generateKeys();
+        const pubB64 = await exportKey(myKeyPair.publicKey, "spki");
+        const privB64 = await exportKey(myKeyPair.privateKey, "pkcs8");
+
+        loginBtn.textContent = "登録中...";
+        await withTimeout(db.ref(`users/${val}`).set({ publicKey: pubB64 }));
+
+        myUsername = val;
+
+        try {
+          localStorage.setItem('bunker_my_username', myUsername);
+          localStorage.setItem('bunker_my_privkey', privB64);
+        } catch (e) {
+          console.warn("Storage write failed:", e);
+        }
+
+        document.getElementById('login-modal').style.display = 'none';
+        document.getElementById('my-name-display').textContent = `ID: @${myUsername}`;
+        loadDmList();
+        listenInbox();
+      } catch (e) {
+        alert("登録エラー:\n" + (e.message || e));
+      } finally {
+        loginBtn.disabled = false;
+        loginBtn.textContent = "チャット開始";
+      }
+    };
+
+    function saveDmList() {
+      if (!myUsername) return;
+      try {
+        localStorage.setItem(`bunker_dms_${myUsername}`, JSON.stringify([...dmUsers]));
+      } catch (e) {}
+    }
+
+    function loadDmList() {
+      if (!myUsername) return;
+      try {
+        const saved = localStorage.getItem(`bunker_dms_${myUsername}`);
+        if (saved) {
+          dmUsers = new Set(JSON.parse(saved));
+          renderDmList();
+        }
+      } catch(e){}
+    }
+
+    function renderDmList() {
+      const listEl = document.getElementById('dm-list');
+      listEl.innerHTML = '';
+      dmUsers.forEach(target => {
+        const item = document.createElement('div');
+        item.className = `dm-item ${target === activeTargetUser ? 'active' : ''}`;
+        item.onclick = () => openChatWith(target);
+        item.innerHTML = `
+          <span class="dm-name">@${escapeHtml(target)}</span>
+          <button class="dm-del-btn" onclick="removeDmTarget('${escapeHtml(target)}', event)">✕</button>
+        `;
+        listEl.appendChild(item);
+      });
+    }
+
+    function listenInbox() {
+      if (!myUsername || !db) return;
+      db.ref(`users/${myUsername}/inbox`).on('child_added', (snapshot) => {
+        const sender = snapshot.key;
+        if (sender && sender !== myUsername) {
+          dmUsers.add(sender);
+          saveDmList();
+          renderDmList();
+        }
+      });
+    }
+
+    window.removeDmTarget = function(target, event) {
+      event.stopPropagation();
+      dmUsers.delete(target);
+      saveDmList();
+      renderDmList();
+      if (activeTargetUser === target) {
+        activeTargetUser = null;
+        if (currentDmRef) currentDmRef.off();
+        document.getElementById('current-chat-title').textContent = 'DM相手を選択してください';
+        document.getElementById('msg-input').disabled = true;
+        document.getElementById('send-btn').disabled = true;
+        document.getElementById('message-list').innerHTML = '<div style="text-align: center; color: var(--text-muted); font-size: 12px; padding: 20px;">相手を選択してください</div>';
+      }
+    };
+
+    async function openChatWith(target) {
+      if (!db) return alert("Firebaseが接続されていません");
+      try {
+        const snap = await withTimeout(db.ref(`users/${target}`).once('value'));
+        if (!snap.exists()) {
+          alert("該当するIDは見つかりません");
+          return;
+        }
+
+        const targetPubStr = snap.val().publicKey;
+        const targetPubKey = await importPublicKey(targetPubStr);
+
+        activeSharedKey = await deriveSharedKey(myKeyPair.privateKey, targetPubKey);
+        activeTargetUser = target;
+
+        dmUsers.add(target);
+        saveDmList();
+        renderDmList();
+
+        document.getElementById('current-chat-title').textContent = `@${target}`;
+        document.getElementById('msg-input').disabled = false;
+        document.getElementById('send-btn').disabled = false;
+        document.getElementById('app-container').classList.add('mobile-chat-active');
+
+        const roomId = [myUsername, target].sort().join('___');
+        if (currentDmRef) currentDmRef.off();
+        currentDmRef = db.ref(`dms/${roomId}`);
+
+        currentDmRef.on('value', async (snapshot) => {
+          const list = document.getElementById('message-list');
+          list.innerHTML = '';
+
+          if (!snapshot.exists()) {
+            list.innerHTML = '<div style="text-align: center; color: var(--text-muted); font-size: 12px; padding: 20px;">メッセージはありません。</div>';
+            return;
+          }
+
+          const data = snapshot.val();
+          for (let id in data) {
+            const item = document.createElement('div');
+            item.className = 'message-item';
+            try {
+              const jsonStr = await decryptText(data[id].ciphertext, activeSharedKey);
+              const m = JSON.parse(jsonStr);
+
+              item.innerHTML = `
+                <div class="avatar">${escapeHtml(m.sender.charAt(0).toUpperCase())}</div>
+                <div class="message-content">
+                  <div class="message-meta">
+                    <span class="username">@${escapeHtml(m.sender)}</span>
+                    <span class="timestamp">${escapeHtml(m.time)}</span>
+                  </div>
+                  <div class="message-body">${escapeHtml(m.text)}</div>
+                </div>
+              `;
+            } catch (e) {
+              item.innerHTML = `
+                <div class="avatar">?</div>
+                <div class="message-content">
+                  <div class="message-body message-error">⚠️ 復号失敗: 鍵が不一致です。</div>
+                </div>
+              `;
+            }
+            list.appendChild(item);
+          }
+          list.scrollTop = list.scrollHeight;
+        });
+      } catch (e) {
+        alert("接続エラー: " + (e.message || e));
+      }
+    }
+
+    async function handleSendMessage() {
+      const input = document.getElementById('msg-input');
+      const text = input.value.trim();
+      if (!text || !currentDmRef || !activeSharedKey) return;
+
+      input.value = '';
+
+      const now = new Date();
+      const timeStr = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
+
+      try {
+        const payload = JSON.stringify({ sender: myUsername, text: text, time: timeStr });
+        const encrypted = await encryptText(payload, activeSharedKey);
+
+        await withTimeout(currentDmRef.push({ ciphertext: encrypted }));
+        await withTimeout(db.ref(`users/${activeTargetUser}/inbox/${myUsername}`).set(true));
+      } catch (e) {
+        alert("送信エラー: " + (e.message || e));
+      }
+    }
+
+    window.addEventListener('load', async () => {
+      const input = document.getElementById('my-username-input');
+      if (input) {
+        input.addEventListener('keydown', (e) => {
+          if (e.key === 'Enter') window.startLoginProcess();
+        });
+      }
+
+      document.getElementById('add-dm-btn').addEventListener('click', () => {
+        const target = document.getElementById('target-user-input').value.trim();
