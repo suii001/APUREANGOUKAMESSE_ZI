@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <link rel="manifest" href="manifest.json">
+  <title>Bunker E2EE</title>
+  <style>
+    :root {
+      --bg-dark: #100505;
+      --bg-panel: #1b0a0a;
+      --accent-red: #8b0000;
+      --gold-accent: #d4af37;
+      --text-main: #f0f0f0;
+      --border-color: #3d1414;
+    }
+    body {
+      margin: 0;
+      background-color: var(--bg-dark);
+      color: var(--text-main);
+      font-family: monospace;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+    header {
+      padding: 12px;
+      background-color: var(--bg-panel);
+      border-bottom: 1px solid var(--border-color);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-weight: bold;
+      color: #ff4d4d;
+    }
+    .container {
+      flex: 1;
+      padding: 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    input, button, textarea {
+      background: #270e0e;
+      border: 1px solid var(--border-color);
+      color: var(--text-main);
+      padding: 10px;
+      border-radius: 6px;
+      font-family: monospace;
+      font-size: 14px;
+    }
+    button {
+      background-color: var(--accent-red);
+      font-weight: bold;
+      cursor: pointer;
+    }
+    .chat-box {
+      flex: 1;
+      border: 1px solid var(--border-color);
+      background: rgba(0,0,0,0.4);
+      padding: 10px;
+      overflow-y: auto;
+      border-radius: 6px;
+    }
+  </style>
+  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-database-compat.js"></script>
+</head>
+<body>
+  <header>
+    <span>Bunker [Protected]</span>
+    <span id="my-id-display" style="color: var(--gold-accent); font-size: 12px;">OFFLINE</span>
+  </header>
+
+  <div class="container">
+    <div id="login-section">
+      <p style="font-size: 12px; color: #a08080;">Agent IDを入力してください:</p>
+      <div style="display:flex; gap:6px;">
+        <input type="text" id="username-input" placeholder="agent_01" style="flex:1;">
+        <button id="register-btn">接続</button>
+      </div>
+    </div>
+
+    <div id="chat-section" style="display:none; flex:1; flex-direction:column; gap:8px;">
+      <div style="display:flex; gap:6px;">
+        <input type="text" id="target-input" placeholder="通信相手のID" style="flex:1;">
+        <button id="connect-target-btn">チャット開始</button>
+      </div>
+      <div class="chat-box" id="chat-messages"></div>
+      <div style="display:flex; gap:6px;">
+        <textarea id="msg-input" placeholder="暗号化メッセージ..." style="flex:1; height:40px; resize:none;"></textarea>
+        <button id="send-btn">送信</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+  <script>
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('./sw.js')
+        .then(() => console.log('Bunker Protected SW Registered'))
+        .catch(err => console.error('SW Register Error:', err));
+    }
+  </script>
+</body>
+</html>
