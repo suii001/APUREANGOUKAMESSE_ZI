@@ -1,0 +1,16 @@
+{
+  "short_name": "Bunker",
+  "name": "Bunker E2EE Protected",
+  "icons": [
+    {
+      "src": "icon.png",
+      "type": "image/png",
+      "sizes": "192x192"
+    }
+  ],
+  "start_url": "./index.html",
+  "background_color": "#100505",
+  "theme_color": "#8b0000",
+  "display": "standalone",
+  "orientation": "portrait"
+}
