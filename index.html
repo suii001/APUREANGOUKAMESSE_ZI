@@ -1,0 +1,701 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>Bunker - E2EE Secure Messenger</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&display=swap" rel="stylesheet">
+  
+  <style>
+    :root {
+      --bg-dark: rgba(16, 5, 5, 0.85);
+      --bg-panel: rgba(27, 10, 10, 0.88);
+      --bg-msg: rgba(42, 15, 15, 0.9);
+      --accent-red: #8b0000;
+      --gold-accent: #d4af37;
+      --text-main: #f0f0f0;
+      --text-muted: #a08080;
+      --border-color: #3d1414;
+      --font-mono: 'Share Tech Mono', ui-monospace, 'Cascadia Code', 'Source Code Pro', Consolas, 'Courier New', monospace;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+    html, body {
+      height: 100%; height: 100dvh; overflow: hidden; background-color: #7a0000;
+      background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 500 500'><rect width='100%' height='100%' fill='%237a0000'/><g transform='translate(250, 250)'><circle cx='0' cy='0' r='210' fill='none' stroke='%23d4af37' stroke-width='2' opacity='0.8'/><circle cx='0' cy='0' r='195' fill='none' stroke='%23d4af37' stroke-width='1.5' opacity='0.8'/><circle cx='0' cy='0' r='180' fill='none' stroke='%23d4af37' stroke-width='1' opacity='0.8'/><circle cx='0' cy='0' r='150' fill='none' stroke='%23d4af37' stroke-width='2' opacity='0.9'/><ellipse cx='0' cy='0' rx='150' ry='50' fill='none' stroke='%23d4af37' stroke-width='1' opacity='0.7'/><ellipse cx='0' cy='0' rx='50' ry='150' fill='none' stroke='%23d4af37' stroke-width='1' opacity='0.7'/><line x1='-150' y1='0' x2='150' y2='0' stroke='%23d4af37' stroke-width='1' opacity='0.7'/><line x1='0' y1='-150' x2='0' y2='150' stroke='%23d4af37' stroke-width='1' opacity='0.7'/><polygon points='0,-115 33,-19 120,-19 48,36 75,120 0,70 -75,120 -48,36 -120,-19 -33,-19' fill='none' stroke='%23d4af37' stroke-width='3' opacity='0.95'/><circle cx='12' cy='-195' r='5' fill='%23ff0000'/></g></svg>");
+      background-repeat: no-repeat; background-position: center; background-size: cover;
+      color: var(--text-main); font-family: var(--font-mono); letter-spacing: 0.5px;
+    }
+    body { display: flex; justify-content: center; align-items: center; }
+    .app-container { background-color: var(--bg-panel); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); width: 100%; max-width: 900px; height: 100%; height: 100dvh; display: flex; border: 1px solid var(--border-color); overflow: hidden; position: relative; }
+    .sidebar { width: 280px; background-color: var(--bg-dark); border-right: 1px solid var(--border-color); display: flex; flex-direction: column; flex-shrink: 0; height: 100%; }
+    .user-profile-header { padding: 12px; border-bottom: 1px solid var(--border-color); display: flex; align-items: center; gap: 10px; background-color: rgba(16, 5, 5, 0.9); cursor: pointer; transition: background 0.2s; }
+    .user-profile-header:hover { background-color: rgba(42, 12, 12, 0.8); }
+    .my-avatar-container { width: 38px; height: 38px; border-radius: 50%; background-color: var(--accent-red); border: 1px solid var(--gold-accent); display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 14px; flex-shrink: 0; overflow: hidden; position: relative; }
+    .my-avatar-container img { width: 100%; height: 100%; object-fit: cover; }
+    .my-info-text { flex: 1; min-width: 0; }
+    .my-name { font-weight: bold; color: #ff8080; font-size: 13px; word-break: break-all; }
+    .my-status-sub { font-size: 10px; color: var(--gold-accent); }
+    .add-dm-box { padding: 10px 12px; border-bottom: 1px solid var(--border-color); display: flex; gap: 6px; background-color: rgba(16, 5, 5, 0.6); }
+    .add-dm-box input { flex: 1; padding: 8px; font-size: 12px; min-width: 0; }
+    .add-dm-box button { padding: 8px 12px; font-size: 12px; white-space: nowrap; }
+    .dm-list { flex: 1; overflow-y: auto; display: flex; flex-direction: column; padding: 6px 0; }
+    .dm-item { padding: 10px 12px; margin: 3px 8px; display: flex; align-items: center; justify-content: space-between; border: 1px solid rgba(139, 0, 0, 0.35); border-radius: 6px; background-color: rgba(20, 5, 5, 0.6); cursor: pointer; transition: background-color 0.2s ease, border-color 0.2s ease; }
+    .dm-item:hover { background-color: rgba(50, 10, 10, 0.8); border-color: rgba(212, 175, 55, 0.5); }
+    .dm-item.active { background-color: rgba(70, 15, 15, 0.9); border-color: var(--gold-accent); }
+    .dm-info { display: flex; align-items: center; gap: 8px; min-width: 0; }
+    .status-dot { width: 7px; height: 7px; border-radius: 50%; background-color: #382424; border: 1px solid rgba(255, 255, 255, 0.1); display: inline-block; flex-shrink: 0; }
+    .status-dot.online { background-color: #2ecc71; border: none; }
+    .dm-name { font-size: 13px; font-weight: bold; color: var(--text-main); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .dm-del-btn { background: rgba(30, 10, 10, 0.6); border: 1px solid rgba(139, 0, 0, 0.4); border-radius: 4px; color: var(--text-muted); font-size: 10px; padding: 2px 6px; cursor: pointer; transition: all 0.2s; line-height: 1; }
+    .dm-del-btn:hover { color: #ff4d4d; border-color: #ff4d4d; background: rgba(80, 10, 10, 0.8); }
+    .chat-main { flex: 1; display: flex; flex-direction: column; background-color: var(--bg-panel); min-width: 0; height: 100%; height: 100dvh; position: relative; }
+    .chat-header { padding: 10px 16px; background-color: rgba(16, 5, 5, 0.9); border-bottom: 1px solid var(--border-color); display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-shrink: 0; z-index: 10; }
+    .chat-header-left { display: flex; align-items: center; gap: 10px; color: #ff4d4d; font-size: 14px; font-weight: bold; min-width: 0; }
+    .chat-header-right { display: flex; align-items: center; gap: 8px; font-size: 11px; color: var(--text-muted); }
+    .chat-header-right select { background: rgba(27, 10, 10, 0.9); color: var(--gold-accent); border: 1px solid var(--border-color); padding: 3px 6px; border-radius: 4px; font-size: 11px; font-family: var(--font-mono); }
+    .back-btn { display: none; background: none; border: 1px solid var(--border-color); color: var(--text-main); padding: 4px 10px; border-radius: 4px; font-size: 12px; cursor: pointer; flex-shrink: 0; }
+    .chat-messages { flex: 1; min-height: 0; padding: 16px; overflow-y: auto; display: flex; flex-direction: column; gap: 14px; }
+    .message-item { display: flex; gap: 10px; align-items: flex-start; }
+    .avatar { width: 34px; height: 34px; border-radius: 50%; background-color: var(--accent-red); border: 1px solid var(--gold-accent); display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 13px; flex-shrink: 0; overflow: hidden; }
+    .avatar img { width: 100%; height: 100%; object-fit: cover; }
+    .message-content { flex: 1; min-width: 0; }
+    .message-meta { display: flex; gap: 8px; margin-bottom: 4px; font-size: 11px; align-items: center; }
+    .username { color: #ff8080; font-weight: bold; }
+    .timestamp { color: var(--text-muted); }
+    .edited-mark { color: var(--text-muted); font-size: 10px; }
+    .reply-quote { background: rgba(0, 0, 0, 0.3); border-left: 3px solid var(--gold-accent); padding: 4px 8px; margin-bottom: 6px; border-radius: 4px; font-size: 11px; color: var(--text-muted); }
+    .message-body { background-color: var(--bg-msg); padding: 8px 12px; border-radius: 8px; font-size: 13px; line-height: 1.4; word-break: break-all; border: 1px solid var(--border-color); display: inline-block; max-width: 100%; }
+    .onetime-badge { background: rgba(212, 175, 55, 0.15); border: 1px dashed var(--gold-accent); color: var(--gold-accent); padding: 8px 12px; border-radius: 8px; cursor: pointer; font-size: 12px; text-align: center; }
+    .onetime-badge:hover { background: rgba(212, 175, 55, 0.25); }
+    .msg-actions { display: flex; gap: 10px; margin-top: 3px; font-size: 10px; }
+    .msg-action-btn { background: none; border: none; color: var(--text-muted); cursor: pointer; padding: 0; font-family: var(--font-mono); }
+    .msg-action-btn:hover { color: #ff8080; text-decoration: underline; }
+    .typing-indicator { font-size: 11px; color: var(--gold-accent); padding: 4px 16px; font-style: italic; display: none; }
+    .typing-indicator.show { display: block; }
+    .input-panel { display: flex; flex-direction: column; background-color: rgba(16, 5, 5, 0.9); border-top: 1px solid var(--border-color); flex-shrink: 0; position: sticky; bottom: 0; z-index: 10; }
+    .active-mode-banner { display: none; padding: 6px 12px; background: rgba(50, 15, 15, 0.95); border-bottom: 1px solid var(--border-color); font-size: 11px; justify-content: space-between; align-items: center; color: var(--gold-accent); }
+    .active-mode-banner.show { display: flex; }
+    .chat-options-bar { padding: 6px 12px 0 12px; display: flex; gap: 12px; align-items: center; font-size: 11px; color: var(--text-muted); }
+    .chat-options-bar label { display: flex; align-items: center; gap: 4px; cursor: pointer; }
+    .chat-input-area { padding: 8px 12px 10px 12px; padding-bottom: calc(10px + env(safe-area-inset-bottom)); display: flex; gap: 8px; align-items: center; }
+    .file-attach-btn { background: none; border: 1px solid var(--border-color); color: var(--gold-accent); width: 38px; height: 38px; border-radius: 6px; display: flex; align-items: center; justify-content: center; cursor: pointer; font-size: 16px; flex-shrink: 0; }
+    .file-attach-btn:hover { background: rgba(212, 175, 55, 0.1); }
+    input, button, select, textarea { background-color: rgba(27, 10, 10, 0.9); border: 1px solid var(--border-color); color: var(--text-main); padding: 8px 10px; border-radius: 6px; font-size: 13px; outline: none; font-family: var(--font-mono); }
+    textarea { flex: 1; height: 38px; resize: none; }
+    button { background-color: var(--accent-red); font-weight: bold; cursor: pointer; flex-shrink: 0; border: 1px solid rgba(212, 175, 55, 0.3); }
+    button:disabled, textarea:disabled { opacity: 0.4; cursor: not-allowed; }
+    .modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0, 0, 0, 0.85); display: flex; align-items: center; justify-content: center; z-index: 1000; }
+    .modal-box { background-color: var(--bg-panel); backdrop-filter: blur(10px); border: 1px solid var(--border-color); padding: 24px; border-radius: 12px; width: 90%; max-width: 420px; display: flex; flex-direction: column; gap: 14px; text-align: left; }
+    .onetime-modal-content { background-color: var(--bg-panel); border: 2px solid var(--gold-accent); padding: 24px; border-radius: 12px; width: 90%; max-width: 420px; display: flex; flex-direction: column; gap: 16px; text-align: center; }
+    .onetime-body-text { background: rgba(0, 0, 0, 0.4); padding: 16px; border-radius: 8px; font-size: 15px; word-break: break-all; color: var(--text-main); max-height: 300px; overflow-y: auto; text-align: left; }
+    .onetime-body-text img { max-width: 100%; border-radius: 6px; display: block; margin: 0 auto; }
+    .settings-avatar-preview { width: 70px; height: 70px; border-radius: 50%; background-color: var(--accent-red); border: 2px solid var(--gold-accent); margin: 0 auto; display: flex; align-items: center; justify-content: center; font-size: 24px; font-weight: bold; overflow: hidden; cursor: pointer; }
+    .settings-avatar-preview img { width: 100%; height: 100%; object-fit: cover; }
+    @media (max-width: 600px) {
+      .app-container { border: none; }
+      .sidebar { width: 100%; display: flex; }
+      .chat-main { display: none; width: 100%; }
+      .app-container.mobile-chat-active .sidebar { display: none; }
+      .app-container.mobile-chat-active .chat-main { display: flex; }
+      .back-btn { display: inline-block; }
+    }
+  </style>
+
+  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-database-compat.js"></script>
+</head>
+<body>
+
+  <!-- モーダル・UI要素群 -->
+  <div id="login-modal" class="modal-overlay" style="display: none;">
+    <div class="modal-box" style="text-align: center;">
+      <h3 style="color: #ff4d4d;" id="txt-login-title">Bunker - User Registration</h3>
+      <p style="font-size: 12px; color: var(--text-muted);" id="txt-login-desc">Enter a unique ID for end-to-end encrypted communication</p>
+      <input type="text" id="my-username-input" placeholder="e.g. agent_01" onkeydown="if(event.key==='Enter') document.getElementById('login-btn').click()">
+      <button type="button" id="login-btn" style="width: 100%;">Start Connection</button>
+      <div style="border-top: 1px solid var(--border-color); margin-top: 10px; padding-top: 10px;">
+        <input type="file" id="import-key-file" accept=".json" style="display:none;" onchange="importAccountKey(event)">
+        <button type="button" onclick="document.getElementById('import-key-file').click()" style="background: #2d1010; width: 100%; font-size: 11px;">Restore Account from Backup File</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="settings-modal" class="modal-overlay" style="display: none;">
+    <div class="modal-box" style="max-height: 90vh; overflow-y: auto;">
+      <h3 style="color: var(--gold-accent); text-align: center;" id="txt-settings-title">Account and System Settings</h3>
+      <div style="text-align: center; margin-top: 4px;">
+        <input type="file" id="avatar-file-input" accept="image/*" style="display:none" onchange="handleAvatarSelect(event)">
+        <div class="settings-avatar-preview" id="settings-avatar-preview" onclick="document.getElementById('avatar-file-input').click()" title="Tap to change icon"><span>?</span></div>
+        <div style="font-size: 10px; color: var(--text-muted); margin-top: 4px;" id="txt-avatar-hint">Tap to change profile icon</div>
+      </div>
+      <div style="display: flex; flex-direction: column; gap: 4px;">
+        <label style="font-size: 12px; color: var(--text-muted);" id="txt-userid-label">User ID (Fixed)</label>
+        <input type="text" id="settings-username-display" disabled style="background: rgba(15,5,5,0.5); color: #ff8080;">
+      </div>
+      <div style="display: flex; flex-direction: column; gap: 4px;">
+        <label style="font-size: 12px; color: var(--text-muted);" id="txt-lang-label">Language / 言語 / Язык</label>
+        <select id="settings-lang-select"><option value="ja">日本語</option><option value="ru">Русский</option><option value="en">English</option></select>
+      </div>
+      <div style="display: flex; flex-direction: column; gap: 4px;">
+        <label style="font-size: 12px; color: var(--text-muted);" id="txt-default-timer-label">Default Message Deletion Time</label>
+        <select id="settings-default-timer"><option value="300000">5 minutes</option><option value="7200000">2 hours</option><option value="86400000">24 hours</option><option value="0">Unlimited</option></select>
+      </div>
+      <div style="display: flex; align-items: center; gap: 8px; margin-top: 4px;">
+        <input type="checkbox" id="settings-bot-checkbox" style="width: 18px; height: 18px;">
+        <label for="settings-bot-checkbox" style="font-size: 13px; cursor: pointer;" id="txt-bot-enable-label">Enable Test Bot (bunker_bot)</label>
+      </div>
+      <div style="display: flex; align-items: center; gap: 8px;">
+        <input type="checkbox" id="settings-sound-checkbox" style="width: 18px; height: 18px;" checked>
+        <label for="settings-sound-checkbox" style="font-size: 13px; cursor: pointer;" id="txt-sound-enable-label">Enable Notification Sound</label>
+      </div>
+      <div style="border-top: 1px solid var(--border-color); padding-top: 10px; display: flex; flex-direction: column; gap: 6px;">
+        <button type="button" onclick="exportAccountKey()" style="background: #2d1010; width: 100%; text-align: center; font-size: 11px;">Export Account Key Backup</button>
+        <button type="button" onclick="openSystemInfoModal()" style="background: #2d1010; width: 100%; text-align: center;" id="btn-system-info">System Information & Specs</button>
+      </div>
+      <div style="display: flex; gap: 8px; margin-top: 6px;">
+        <button type="button" onclick="closeSettingsModal()" style="flex: 1; background: #3d1414;" id="btn-cancel">Cancel</button>
+        <button type="button" onclick="saveSettings()" style="flex: 1; background: var(--accent-red);" id="btn-save">Save</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="system-info-modal" class="modal-overlay" style="display: none;">
+    <div class="modal-box">
+      <h3 style="color: var(--gold-accent);" id="sys-info-title">System Information</h3>
+      <div style="font-size: 12px; color: var(--text-main); line-height: 1.5; display: flex; flex-direction: column; gap: 8px;">
+        <p><strong>Name:</strong> Bunker (E2EE Secure Messenger)</p>
+        <p id="sys-info-desc"><strong>Specifications:</strong> End-to-end encryption (ECDH + AES-GCM) implemented client-side. Messages automatically expire based on user-defined timers.</p>
+      </div>
+      <button type="button" onclick="closeSystemInfoModal()" style="background: var(--accent-red); width: 100%;" id="btn-close-info">Close</button>
+    </div>
+  </div>
+
+  <div id="onetime-modal" class="modal-overlay" style="display: none;">
+    <div class="onetime-modal-content">
+      <h3 style="color: var(--gold-accent);" id="txt-onetime-title">One-Time Message</h3>
+      <div id="onetime-modal-body" class="onetime-body-text"></div>
+      <button type="button" onclick="closeOnetimeModal()" style="padding: 10px; background: var(--accent-red);" id="btn-close-onetime">Close (This message will self-destruct)</button>
+    </div>
+  </div>
+
+  <div class="app-container" id="app-container">
+    <div class="sidebar">
+      <div class="user-profile-header" onclick="openSettingsModal()">
+        <div class="my-avatar-container" id="my-avatar-display">?</div>
+        <div class="my-info-text">
+          <div class="my-name" id="my-name-display">ID: ---</div>
+          <div class="my-status-sub" id="txt-open-settings">Open Settings</div>
+        </div>
+      </div>
+      <div class="add-dm-box">
+        <input type="text" id="target-user-input" placeholder="Target ID" onkeydown="if(event.key==='Enter') document.getElementById('add-dm-btn').click()">
+        <button type="button" id="add-dm-btn">Add</button>
+      </div>
+      <div class="dm-list" id="dm-list"></div>
+    </div>
+
+    <div class="chat-main">
+      <div class="chat-header">
+        <div class="chat-header-left">
+          <button class="back-btn" id="back-btn">Back</button>
+          <span id="current-chat-title">Select a DM partner</span>
+        </div>
+        <div class="chat-header-right">
+          <span id="txt-timer-label">Auto-delete:</span>
+          <select id="timer-select" onchange="updateTimerSetting()">
+            <option value="300000">5 min</option>
+            <option value="7200000">2 hours</option>
+            <option value="86400000">24 hours</option>
+            <option value="0">Unlimited</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="chat-messages" id="message-list">
+        <div style="text-align: center; color: var(--text-muted); font-size: 12px; padding: 20px;" id="txt-welcome-msg">
+          Welcome to Bunker. Encrypted secure communication channel.
+        </div>
+      </div>
+
+      <div class="typing-indicator" id="typing-indicator">typing...</div>
+
+      <div class="input-panel">
+        <div id="mode-banner" class="active-mode-banner">
+          <span id="mode-banner-text">Replying</span>
+          <button type="button" onclick="cancelMode()" style="background:none; border:none; color:#ff8080; font-size:11px; cursor:pointer;" id="btn-cancel-mode">Cancel</button>
+        </div>
+        <div class="chat-options-bar">
+          <label><input type="checkbox" id="onetime-checkbox"> <span id="txt-onetime-label">One-Time (Self-destruct on read)</span></label>
+        </div>
+        <div class="chat-input-area">
+          <input type="file" id="file-input" accept="image/*" style="display:none" onchange="handleFileSelect(event)">
+          <button type="button" class="file-attach-btn" title="Attach Image" onclick="document.getElementById('file-input').click()">+</button>
+          <textarea id="msg-input" placeholder="Enter encrypted message..." disabled oninput="handleTyping()"></textarea>
+          <button id="send-btn" type="button" style="width: 70px;" disabled>Send</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // =========================================================
+    // ★重要: ここを自分自身のFirebaseプロジェクトの情報に書き換えてください★
+    // =========================================================
+    const firebaseConfig = {
+      apiKey: "YOUR_API_KEY",
+      authDomain: "YOUR_PROJECT_ID.firebaseapp.com",
+      databaseURL: "https://YOUR_PROJECT_ID-default-rtdb.REGION.firebasedatabase.app",
+      projectId: "YOUR_PROJECT_ID",
+      storageBucket: "YOUR_PROJECT_ID.firebasestorage.app",
+      messagingSenderId: "YOUR_MESSAGING_SENDER_ID",
+      appId: "YOUR_APP_ID"
+    };
+    // =========================================================
+
+    firebase.initializeApp(firebaseConfig);
+    const auth = firebase.auth();
+    const db = firebase.database();
+
+    // 以下の処理は元のコードと同一のため省略・修正なし
+    let myUsername = '';
+    let myKeyPair = null;
+    let myAvatarBase64 = null;
+    let activeTargetUser = null;
+    let activeSharedKey = null;
+    let currentDmRef = null;
+    let typingRef = null;
+    let dmUsers = new Set();
+    let userStatuses = {};
+    let decryptedMessageCache = [];
+    let currentTimerMs = 7200000;
+    let currentLanguage = 'ja';
+    let botEnabled = false;
+    let soundEnabled = true;
+    let typingTimeout = null;
+    let currentMode = "normal";
+    let activeReplyData = null;
+    let editingMessageId = null;
+    let attachedFileBase64 = null;
+    let pendingDeleteMessageId = null;
+    let tempAvatarSelection = null;
+    const BOT_USERNAME = "bunker_bot";
+    let botKeyPair = null;
+    const BOT_DEFAULT_AVATAR = "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' fill='%235a0000'/><circle cx='50' cy='50' r='40' fill='none' stroke='%23d4af37' stroke-width='4'/><text x='50' y='63' font-size='42' font-weight='bold' fill='%23d4af37' text-anchor='middle' font-family='sans-serif'>B</text></svg>";
+
+    const i18n = {
+      ja: { loginTitle: "Bunker - ユーザー登録", loginDesc: "エンドツーエンド暗号化通信のためのIDを入力してください", loginBtn: "接続開始", settingsTitle: "アカウントとシステム設定", avatarHint: "タップしてアイコン画像を変更", userIdLabel: "ユーザーID (変更不可)", langLabel: "言語 / Language / Язык", defaultTimerLabel: "デフォルトのメッセージ削除時間", botEnableLabel: "テスト用Bot有効化 (bunker_bot)", soundEnableLabel: "通知音を有効にする", systemInfoBtn: "システム情報と仕様を確認", cancel: "キャンセル", save: "保存", sysInfoTitle: "システム情報", sysInfoDesc: "名称: Bunker (E2EEセキュアメッセンジャー)\n仕様: 認証保護およびクライアント側での完全なエンドツーエンド暗号化 (ECDH + AES-GCM) を実装。指定時間後にメッセージは自動消去されます。", close: "閉じる", onetimeTitle: "ワンタイムメッセージ", closeOnetime: "閉じる (このメッセージは消滅します)", openSettings: "設定を開く", add: "追加", targetPlaceholder: "相手のID", selectPartner: "DM相手を選択してください", autoDelete: "自動消去:", welcome: "Bunkerへようこそ。暗号化された安全な通信路です。", replying: "返信中", canc: "キャンセル", onetimeLabel: "ワンタイム (開封後に消滅)", placeholder: "暗号化メッセージを入力...", send: "送信", update: "更新", noMsg: "メッセージはありません", revFail: "復号失敗: 鍵が不一致です" },
+      ru: { loginTitle: "Bunker - Регистрация", loginDesc: "Введите уникальный ID для сквозного шифрования", loginBtn: "Подключиться", settingsTitle: "Настройки аккаунта и системы", avatarHint: "Нажмите, чтобы изменить аватар", userIdLabel: "ID пользователя (фиксированный)", langLabel: "Язык / Language / 言語", defaultTimerLabel: "Время автоудаления по умолчанию", botEnableLabel: "Включить тестового бота (bunker_bot)", soundEnableLabel: "Включить звук уведомлений", systemInfoBtn: "Информация о системе", cancel: "Отмена", save: "Сохранить", sysInfoTitle: "Информация о системе", sysInfoDesc: "Название: Bunker (E2EE Мессенджер)\nХарактеристики: Клиентское сквозное шифрование (ECDH + AES-GCM). Сообщения автоматически удаляются по таймеру.", close: "Закрыть", onetimeTitle: "Одноразовое сообщение", closeOnetime: "Закрыть (сообщение будет уничтожено)", openSettings: "Открыть настройки", add: "Добавить", targetPlaceholder: "ID собеседника", selectPartner: "Выберите собеседника", autoDelete: "Автоудаление:", welcome: "Добро пожаловать в Bunker. Зашифрованный канал связи.", replying: "Ответ на сообщение", canc: "Отмена", onetimeLabel: "Одноразовое (самоуничтожение при прочтении)", placeholder: "Введите зашифрованное сообщение...", send: "Отправить", update: "Обновить", noMsg: "Нет сообщений", revFail: "Ошибка расшифровки: ключи не совпадают" },
+      en: { loginTitle: "Bunker - User Registration", loginDesc: "Enter a unique ID for end-to-end encrypted communication", loginBtn: "Start Connection", settingsTitle: "Account and System Settings", avatarHint: "Tap to change profile icon", userIdLabel: "User ID (Fixed)", langLabel: "Language / 言語 / Язык", defaultTimerLabel: "Default Message Deletion Time", botEnableLabel: "Enable Test Bot (bunker_bot)", soundEnableLabel: "Enable Notification Sound", systemInfoBtn: "System Information & Specs", cancel: "Cancel", save: "Save", sysInfoTitle: "System Information", sysInfoDesc: "Name: Bunker (E2EE Secure Messenger)\nSpecs: Auth-protected, client-side end-to-end encryption (ECDH + AES-GCM). Messages automatically expire based on user-defined timers.", close: "Close", onetimeTitle: "One-Time Message", closeOnetime: "Close (This message will self-destruct)", openSettings: "Open Settings", add: "Add", targetPlaceholder: "Target ID", selectPartner: "Select a DM partner", autoDelete: "Auto-delete:", welcome: "Welcome to Bunker. Encrypted secure communication channel.", replying: "Replying", canc: "Cancel", onetimeLabel: "One-Time (Self-destruct on read)", placeholder: "Enter encrypted message...", send: "Send", update: "Update", noMsg: "No messages", revFail: "Decryption failed: Key mismatch" }
+    };
+
+    function t(key) { return (i18n[currentLanguage] && i18n[currentLanguage][key]) || i18n['ja'][key] || key; }
+
+    function updateUITexts() {
+      const setTxt = (id, text) => { const el = document.getElementById(id); if (el) el.textContent = text; };
+      const setPh = (id, text) => { const el = document.getElementById(id); if (el) el.placeholder = text; };
+      setTxt('txt-login-title', t('loginTitle')); setTxt('txt-login-desc', t('loginDesc')); setTxt('login-btn', t('loginBtn')); setTxt('txt-settings-title', t('settingsTitle')); setTxt('txt-avatar-hint', t('avatarHint')); setTxt('txt-userid-label', t('userIdLabel')); setTxt('txt-lang-label', t('langLabel')); setTxt('txt-default-timer-label', t('defaultTimerLabel')); setTxt('txt-bot-enable-label', t('botEnableLabel')); setTxt('txt-sound-enable-label', t('soundEnableLabel')); setTxt('btn-system-info', t('systemInfoBtn')); setTxt('btn-cancel', t('cancel')); setTxt('btn-save', t('save')); setTxt('sys-info-title', t('sysInfoTitle')); setTxt('btn-close-info', t('close')); setTxt('txt-onetime-title', t('onetimeTitle')); setTxt('btn-close-onetime', t('closeOnetime')); setTxt('txt-open-settings', t('openSettings')); setPh('target-user-input', t('targetPlaceholder')); setTxt('add-dm-btn', t('add')); setTxt('txt-timer-label', t('autoDelete')); setTxt('txt-welcome-msg', t('welcome')); setTxt('btn-cancel-mode', t('canc')); setTxt('txt-onetime-label', t('onetimeLabel')); setPh('msg-input', t('placeholder'));
+      const sendBtn = document.getElementById('send-btn'); if (sendBtn && !sendBtn.dataset.editing) sendBtn.textContent = t('send');
+    }
+
+    function playNotificationSound() {
+      if (!soundEnabled) return;
+      try {
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.type = 'sine'; osc.frequency.setValueAtTime(587.33, audioCtx.currentTime);
+        gain.gain.setValueAtTime(0.1, audioCtx.currentTime); gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.15);
+        osc.connect(gain); gain.connect(audioCtx.destination);
+        osc.start(); osc.stop(audioCtx.currentTime + 0.15);
+      } catch (e) {}
+    }
+
+    function bufferToBase64(buffer) {
+      const bytes = new Uint8Array(buffer); let binary = '';
+      for (let i = 0; i < bytes.byteLength; i += 0x8000) { binary += String.fromCharCode.apply(null, bytes.subarray(i, i + 0x8000)); }
+      return btoa(binary);
+    }
+
+    async function generateKeys() { return await window.crypto.subtle.generateKey({ name: "ECDH", namedCurve: "P-256" }, true, ["deriveKey"]); }
+    async function exportKey(key, format) { const exported = await window.crypto.subtle.exportKey(format, key); return bufferToBase64(exported); }
+    async function importPublicKey(base64) { const binary = Uint8Array.from(atob(base64), c => c.charCodeAt(0)); return await window.crypto.subtle.importKey("spki", binary, { name: "ECDH", namedCurve: "P-256" }, true, []); }
+    async function importPrivateKey(base64) { const binary = Uint8Array.from(atob(base64), c => c.charCodeAt(0)); return await window.crypto.subtle.importKey("pkcs8", binary, { name: "ECDH", namedCurve: "P-256" }, true, ["deriveKey"]); }
+    async function deriveSharedKey(privKey, pubKey) { return await window.crypto.subtle.deriveKey({ name: "ECDH", public: pubKey }, privKey, { name: "AES-GCM", length: 256 }, false, ["encrypt", "decrypt"]); }
+    async function encryptText(text, key) {
+      const iv = window.crypto.getRandomValues(new Uint8Array(12));
+      const enc = await window.crypto.subtle.encrypt({ name: "AES-GCM", iv: iv }, key, new TextEncoder().encode(text));
+      const combined = new Uint8Array(12 + enc.byteLength); combined.set(iv, 0); combined.set(new Uint8Array(enc), 12);
+      return bufferToBase64(combined);
+    }
+    async function decryptText(base64, key) {
+      const data = Uint8Array.from(atob(base64), c => c.charCodeAt(0));
+      const dec = await window.crypto.subtle.decrypt({ name: "AES-GCM", iv: data.slice(0, 12) }, key, data.slice(12));
+      return new TextDecoder().decode(dec);
+    }
+
+    function escapeHtml(str) { return String(str).replace(/[&<>"']/g, m => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' }[m])); }
+
+    window.exportAccountKey = async function() {
+      try {
+        if (!myUsername || !myKeyPair || !myKeyPair.privateKey) { alert("鍵データがロードされていません。一度ページを再読み込みするか、再ログインを行ってください。"); return; }
+        const privB64 = await exportKey(myKeyPair.privateKey, "pkcs8");
+        const pubB64 = myKeyPair.publicKey ? await exportKey(myKeyPair.publicKey, "spki") : null;
+        const data = { username: myUsername, privateKey: privB64, publicKey: pubB64, avatar: myAvatarBase64 };
+        const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a'); a.href = url; a.download = `bunker_key_${myUsername}.json`;
+        document.body.appendChild(a); a.click(); document.body.removeChild(a);
+        setTimeout(() => URL.revokeObjectURL(url), 1000);
+      } catch (err) { alert("エクスポート中にエラーが発生しました: " + (err.message || err)); }
+    };
+
+    window.importAccountKey = function(event) {
+      const file = event.target.files[0]; if (!file) return;
+      const reader = new FileReader();
+      reader.onload = async function(e) {
+        try {
+          const data = JSON.parse(e.target.result);
+          if (!data.username || !data.privateKey) throw new Error("Invalid format");
+          myUsername = data.username;
+          myKeyPair = { privateKey: await importPrivateKey(data.privateKey), publicKey: data.publicKey ? await importPublicKey(data.publicKey) : null };
+          myAvatarBase64 = data.avatar || null;
+          localStorage.setItem('bunker_my_username', myUsername); localStorage.setItem('bunker_my_privkey', data.privateKey);
+          if (data.publicKey) localStorage.setItem('bunker_my_pubkey', data.publicKey);
+          if (myAvatarBase64) localStorage.setItem(`bunker_avatar_${myUsername}`, myAvatarBase64);
+          document.getElementById('login-modal').style.display = 'none';
+          loadSettingsFromLocalStorage(); updateMyHeaderDisplay(); setupPresence(); listenInbox();
+          alert("Account successfully restored!");
+        } catch(err) { alert("Failed to import key: " + err.message); }
+      };
+      reader.readAsText(file);
+    };
+
+    function setupPresence() {
+      if (!myUsername) return;
+      const myStatusRef = db.ref(`users/${myUsername}/status`);
+      const connectedRef = db.ref('.info/connected');
+      connectedRef.on('value', (snap) => {
+        if (snap.val() === false) return;
+        myStatusRef.onDisconnect().set('offline').then(() => { myStatusRef.set('online'); });
+      });
+    }
+
+    function listenUserStatuses() {
+      db.ref('users').on('value', (snap) => {
+        const users = snap.val(); userStatuses = {};
+        if (users) { for (let u in users) { if (users[u].status) { userStatuses[u] = users[u].status; } } }
+        renderDmList();
+      });
+    }
+
+    function handleTyping() {
+      if (!activeTargetUser || !myUsername) return;
+      const roomId = [myUsername, activeTargetUser].sort().join('___');
+      db.ref(`dms/${roomId}/typing/${myUsername}`).set(true);
+      if (typingTimeout) clearTimeout(typingTimeout);
+      typingTimeout = setTimeout(() => { db.ref(`dms/${roomId}/typing/${myUsername}`).remove(); }, 2000);
+    }
+
+    function listenTyping(roomId) {
+      if (typingRef) typingRef.off();
+      typingRef = db.ref(`dms/${roomId}/typing/${activeTargetUser}`);
+      typingRef.on('value', (snap) => {
+        const isTyping = snap.val(); const indicator = document.getElementById('typing-indicator');
+        if (isTyping) { indicator.textContent = `@${activeTargetUser} is typing...`; indicator.classList.add('show'); }
+        else { indicator.classList.remove('show'); }
+      });
+    }
+
+    function renderMessagesFromCache() {
+      const list = document.getElementById('message-list'); list.innerHTML = '';
+      if (decryptedMessageCache.length === 0) { list.innerHTML = `<div style="text-align: center; color: var(--text-muted); font-size: 12px; padding: 20px;">${t('noMsg')}</div>`; return; }
+
+      decryptedMessageCache.forEach(({ id, msg: m, isError }) => {
+        const item = document.createElement('div'); item.className = 'message-item';
+        if (isError) { item.innerHTML = `<div class="avatar">?</div><div class="message-content"><div class="message-body message-error">${t('revFail')}</div></div>`; list.appendChild(item); return; }
+
+        let replyHtml = m.replyTo ? `<div class="reply-quote"><strong>@${escapeHtml(m.replyTo.sender)}</strong>: ${escapeHtml(m.replyTo.text)}</div>` : '';
+        let editedHtml = m.edited ? `<span class="edited-mark">(edited)</span>` : '';
+        let bodyHtml = '';
+
+        if (m.onetime) {
+          const badgeText = m.file ? '[One-Time Image - Tap to open]' : '[One-Time Message - Tap to open]';
+          bodyHtml = `<div class="onetime-badge" onclick="openOnetimeMessage('${id}', '${escapeHtml(m.text || '').replace(/'/g, "\\'")}', '${m.file || ''}')">${badgeText}</div>`;
+        } else {
+          let fileHtml = m.file ? `<img src="${m.file}" alt="image" style="max-width:100%; max-height:200px; border-radius:4px; display:block; margin-top:4px;" onclick="window.open('${m.file}')">` : '';
+          bodyHtml = `<div class="message-body">${escapeHtml(m.text || '')}${fileHtml}</div>`;
+        }
+
+        let actionsHtml = `<button class="msg-action-btn" onclick="startReply('${id}', '${escapeHtml(m.sender)}', '${escapeHtml(m.text || '[Image]').replace(/'/g, "\\'")}')">Reply</button>`;
+        if (m.sender === myUsername) {
+          if (!m.onetime) actionsHtml += ` <button class="msg-action-btn" onclick="startEdit('${id}', '${escapeHtml(m.text || '').replace(/'/g, "\\'")}')">Edit</button>`;
+          actionsHtml += ` <button class="msg-action-btn" style="color:#ff6b6b;" onclick="deleteMessage('${id}')">Delete</button>`;
+        }
+
+        let avatarInner = escapeHtml(m.sender.charAt(0).toUpperCase());
+        let avatarSrc = m.sender === BOT_USERNAME ? BOT_DEFAULT_AVATAR : m.senderAvatar;
+        if (avatarSrc) avatarInner = `<img src="${avatarSrc}" alt="avatar">`;
+
+        item.innerHTML = `<div class="avatar">${avatarInner}</div><div class="message-content"><div class="message-meta"><span class="username">@${escapeHtml(m.sender)}</span><span class="timestamp">${escapeHtml(m.time)}</span>${editedHtml}</div>${replyHtml}${bodyHtml}<div class="msg-actions">${actionsHtml}</div></div>`;
+        list.appendChild(item);
+      });
+      list.scrollTop = list.scrollHeight;
+    }
+
+    function saveSettingsToLocalStorage() {
+      if (!myUsername) return;
+      localStorage.setItem(`bunker_prefs_${myUsername}`, JSON.stringify({ lang: currentLanguage, defaultTimer: currentTimerMs, botEnabled: botEnabled, soundEnabled: soundEnabled }));
+      localStorage.setItem(`bunker_dms_${myUsername}`, JSON.stringify([...dmUsers]));
+    }
+
+    function loadSettingsFromLocalStorage() {
+      if (!myUsername) return;
+      const saved = localStorage.getItem(`bunker_prefs_${myUsername}`);
+      if (saved) {
+        try {
+          const p = JSON.parse(saved);
+          if (p.lang) currentLanguage = p.lang;
+          if (p.defaultTimer !== undefined) { currentTimerMs = p.defaultTimer; document.getElementById('timer-select').value = currentTimerMs; }
+          if (p.botEnabled !== undefined) botEnabled = p.botEnabled;
+          if (p.soundEnabled !== undefined) soundEnabled = p.soundEnabled;
+        } catch(e){}
+      }
+      const savedDms = localStorage.getItem(`bunker_dms_${myUsername}`);
+      if (savedDms) { try { dmUsers = new Set(JSON.parse(savedDms)); } catch(e){} }
+      if (botEnabled) dmUsers.add(BOT_USERNAME); else dmUsers.delete(BOT_USERNAME);
+      renderDmList(); updateUITexts();
+    }
+
+    function renderDmList() {
+      const listEl = document.getElementById('dm-list'); listEl.innerHTML = '';
+      dmUsers.forEach(target => {
+        const item = document.createElement('div'); item.className = `dm-item ${target === activeTargetUser ? 'active' : ''}`; item.onclick = () => openChatWith(target);
+        const isOnline = userStatuses[target] === 'online' || target === BOT_USERNAME;
+        const displayName = target === BOT_USERNAME ? 'bunker_bot (Test Bot)' : `@${escapeHtml(target)}`;
+        let delBtnHtml = target === BOT_USERNAME ? '' : `<button class="dm-del-btn" onclick="removeDmTarget('${escapeHtml(target)}', event)">✕</button>`;
+        item.innerHTML = `<div class="dm-info"><span class="status-dot ${isOnline ? 'online' : ''}"></span><span class="dm-name">${displayName}</span></div>${delBtnHtml}`;
+        listEl.appendChild(item);
+      });
+    }
+
+    function listenInbox() {
+      if (!myUsername) return;
+      db.ref(`users/${myUsername}/inbox`).on('child_added', (snapshot) => {
+        const sender = snapshot.key;
+        if (sender && sender !== myUsername) { dmUsers.add(sender); saveSettingsToLocalStorage(); renderDmList(); playNotificationSound(); }
+      });
+    }
+
+    window.removeDmTarget = function(target, event) {
+      event.stopPropagation(); if (target === BOT_USERNAME) return;
+      dmUsers.delete(target); saveSettingsToLocalStorage(); renderDmList();
+      if (activeTargetUser === target) {
+        activeTargetUser = null; if (currentDmRef) currentDmRef.off();
+        document.getElementById('current-chat-title').textContent = t('selectPartner');
+        document.getElementById('msg-input').disabled = true; document.getElementById('send-btn').disabled = true;
+        document.getElementById('message-list').innerHTML = `<div style="text-align: center; color: var(--text-muted); font-size: 12px; padding: 20px;">${t('selectPartner')}</div>`;
+      }
+    };
+
+    window.updateTimerSetting = function() { currentTimerMs = parseInt(document.getElementById('timer-select').value); };
+    window.openSettingsModal = function() { document.getElementById('settings-username-display').value = `@${myUsername}`; document.getElementById('settings-lang-select').value = currentLanguage; document.getElementById('settings-default-timer').value = currentTimerMs; document.getElementById('settings-bot-checkbox').checked = botEnabled; document.getElementById('settings-sound-checkbox').checked = soundEnabled; tempAvatarSelection = myAvatarBase64; updateAvatarPreview(tempAvatarSelection); document.getElementById('settings-modal').style.display = 'flex'; };
+    window.closeSettingsModal = function() { document.getElementById('settings-modal').style.display = 'none'; tempAvatarSelection = null; };
+    window.openSystemInfoModal = function() { document.getElementById('system-info-modal').style.display = 'flex'; };
+    window.closeSystemInfoModal = function() { document.getElementById('system-info-modal').style.display = 'none'; };
+
+    window.handleAvatarSelect = function(event) {
+      const file = event.target.files[0]; if (!file) return; const reader = new FileReader();
+      reader.onload = function(e) {
+        const img = new Image();
+        img.onload = function() {
+          const canvas = document.createElement('canvas'); let width = img.width, height = img.height, maxDim = 200;
+          if (width > height && width > maxDim) { height = Math.round((height * maxDim) / width); width = maxDim; } else if (height > maxDim) { width = Math.round((width * maxDim) / height); height = maxDim; }
+          canvas.width = width; canvas.height = height; const ctx = canvas.getContext('2d'); ctx.drawImage(img, 0, 0, width, height);
+          tempAvatarSelection = canvas.toDataURL('image/jpeg', 0.8); updateAvatarPreview(tempAvatarSelection);
+        }; img.src = e.target.result;
+      }; reader.readAsDataURL(file);
+    };
+
+    function updateAvatarPreview(base64) {
+      const previewEl = document.getElementById('settings-avatar-preview');
+      if (base64) previewEl.innerHTML = `<img src="${base64}" alt="avatar">`; else previewEl.innerHTML = `<span>${myUsername ? myUsername.charAt(0).toUpperCase() : '?'}</span>`;
+    }
+
+    window.saveSettings = async function() {
+      try {
+        myAvatarBase64 = tempAvatarSelection;
+        if (myAvatarBase64) localStorage.setItem(`bunker_avatar_${myUsername}`, myAvatarBase64); else localStorage.removeItem(`bunker_avatar_${myUsername}`);
+        currentLanguage = document.getElementById('settings-lang-select').value;
+        currentTimerMs = parseInt(document.getElementById('settings-default-timer').value); document.getElementById('timer-select').value = currentTimerMs;
+        botEnabled = document.getElementById('settings-bot-checkbox').checked; soundEnabled = document.getElementById('settings-sound-checkbox').checked;
+        if (botEnabled) dmUsers.add(BOT_USERNAME);
+        else { dmUsers.delete(BOT_USERNAME); if (activeTargetUser === BOT_USERNAME) { activeTargetUser = null; if (currentDmRef) currentDmRef.off(); document.getElementById('current-chat-title').textContent = t('selectPartner'); document.getElementById('msg-input').disabled = true; document.getElementById('send-btn').disabled = true; } }
+        saveSettingsToLocalStorage(); updateUITexts(); renderDmList();
+        const uid = auth.currentUser ? auth.currentUser.uid : null;
+        if (myKeyPair && myKeyPair.publicKey) {
+          const pubB64 = await exportKey(myKeyPair.publicKey, "spki");
+          await db.ref(`users/${myUsername}`).update({ publicKey: pubB64, avatar: myAvatarBase64 || null, uid: uid });
+        }
+        updateMyHeaderDisplay(); closeSettingsModal();
+      } catch (e) { alert("Failed to save settings: " + (e.message || e)); }
+    };
+
+    function updateMyHeaderDisplay() {
+      document.getElementById('my-name-display').textContent = `@${myUsername}`; const headerAvatar = document.getElementById('my-avatar-display');
+      if (myAvatarBase64) headerAvatar.innerHTML = `<img src="${myAvatarBase64}" alt="avatar">`; else headerAvatar.innerHTML = myUsername ? myUsername.charAt(0).toUpperCase() : '?';
+    }
+
+    window.handleFileSelect = function(event) {
+      const file = event.target.files[0]; if (!file) return; const reader = new FileReader();
+      reader.onload = function(e) {
+        const img = new Image();
+        img.onload = function() {
+          const canvas = document.createElement('canvas'); let width = img.width, height = img.height, maxDim = 800;
+          if (width > height && width > maxDim) { height = Math.round((height * maxDim) / width); width = maxDim; } else if (height > maxDim) { width = Math.round((width * maxDim) / height); height = maxDim; }
+          canvas.width = width; canvas.height = height; const ctx = canvas.getContext('2d'); ctx.drawImage(img, 0, 0, width, height);
+          attachedFileBase64 = canvas.toDataURL('image/jpeg', 0.7); document.getElementById('msg-input').placeholder = "Image attached. Add a message...";
+        }; img.src = e.target.result;
+      }; reader.readAsDataURL(file);
+    };
+
+    async function setupBotAccount() {
+      try {
+        let botSnap = await db.ref(`users/${BOT_USERNAME}`).once('value');
+        const uid = auth.currentUser ? auth.currentUser.uid : null;
+        if (!botSnap.exists()) {
+          botKeyPair = await generateKeys();
+          const pubB64 = await exportKey(botKeyPair.publicKey, "spki"); const privB64 = await exportKey(botKeyPair.privateKey, "pkcs8");
+          await db.ref(`users/${BOT_USERNAME}`).set({ publicKey: pubB64, avatar: BOT_DEFAULT_AVATAR, uid: uid });
+          localStorage.setItem('bunker_bot_privkey', privB64);
+        } else {
+          let privB64 = localStorage.getItem('bunker_bot_privkey');
+          if (!privB64) {
+            botKeyPair = await generateKeys(); privB64 = await exportKey(botKeyPair.privateKey, "pkcs8"); localStorage.setItem('bunker_bot_privkey', privB64);
+          } else { botKeyPair = { privateKey: await importPrivateKey(privB64) }; }
+          await db.ref(`users/${BOT_USERNAME}`).update({ avatar: BOT_DEFAULT_AVATAR });
+        }
+      } catch(e) {}
+    }
+
+    async function triggerBotReply(roomId, userMessage, isOneTime) {
+      setTimeout(async () => {
+        try {
+          const botSnap = await db.ref(`users/${BOT_USERNAME}`).once('value'); const botPubKey = await importPublicKey(botSnap.val().publicKey);
+          const botPrivKey = await importPrivateKey(localStorage.getItem('bunker_bot_privkey'));
+          const userSnap = await db.ref(`users/${myUsername}`).once('value'); const userPubKey = await importPublicKey(userSnap.val().publicKey);
+          const botSharedKey = await deriveSharedKey(botPrivKey, userPubKey);
+
+          let replyText = `[BOT Response] Received: "${userMessage}"`; if (isOneTime) replyText = `[BOT Response] One-time message received.`;
+          const now = new Date(); const timeStr = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
+          
+          const payload = { sender: BOT_USERNAME, senderAvatar: BOT_DEFAULT_AVATAR, text: replyText, file: null, time: timeStr, timestamp: Date.now(), expiry: currentTimerMs, onetime: isOneTime, edited: false };
+          const encrypted = await encryptText(JSON.stringify(payload), botSharedKey);
+          await db.ref(`dms/${roomId}/messages`).push({ ciphertext: encrypted });
+          playNotificationSound();
+        } catch (err) {}
+      }, 1000);
+    }
+
+    async function openChatWith(target) {
+      try {
+        const snap = await db.ref(`users/${target}`).once('value'); if (!snap.exists()) { alert("Target ID not found"); return; }
+        const targetPubKey = await importPublicKey(snap.val().publicKey);
+        activeSharedKey = await deriveSharedKey(myKeyPair.privateKey, targetPubKey); activeTargetUser = target;
+        dmUsers.add(target); saveSettingsToLocalStorage(); renderDmList();
+        document.getElementById('current-chat-title').textContent = target === BOT_USERNAME ? 'bunker_bot (Test Bot)' : `@${target}`;
+        document.getElementById('msg-input').disabled = false; document.getElementById('send-btn').disabled = false;
+        document.getElementById('app-container').classList.add('mobile-chat-active'); cancelMode();
+
+        const roomId = [myUsername, target].sort().join('___'); listenTyping(roomId);
+        if (currentDmRef) currentDmRef.off(); currentDmRef = db.ref(`dms/${roomId}/messages`);
+        currentDmRef.on('value', async (snapshot) => {
+          decryptedMessageCache = []; if (!snapshot.exists()) { renderMessagesFromCache(); return; }
+          const rawData = snapshot.val(); const now = Date.now();
+          for (let id in rawData) {
+            const msgNode = rawData[id];
+            try {
+              const jsonStr = await decryptText(msgNode.ciphertext, activeSharedKey); const m = JSON.parse(jsonStr);
+              if (m.expiry > 0 && m.timestamp && (now - m.timestamp > m.expiry)) { currentDmRef.child(id).remove(); continue; }
+              decryptedMessageCache.push({ id, msg: m, isError: false });
+            } catch (e) { decryptedMessageCache.push({ id, msg: null, isError: true }); }
+          }
+          renderMessagesFromCache();
+        });
+      } catch (e) { alert("Connection error: " + (e.message || e)); }
+    }
+
+    window.openOnetimeMessage = function(id, text, file) { pendingDeleteMessageId = id; const bodyEl = document.getElementById('onetime-modal-body'); let html = ''; if (text) html += `<p style="margin-bottom: 8px;">${escapeHtml(text)}</p>`; if (file) html += `<img src="${file}" alt="onetime image">`; bodyEl.innerHTML = html; document.getElementById('onetime-modal').style.display = 'flex'; };
+    window.closeOnetimeModal = async function() { document.getElementById('onetime-modal').style.display = 'none'; if (pendingDeleteMessageId && currentDmRef) { try { await currentDmRef.child(pendingDeleteMessageId).remove(); } catch(e) {} pendingDeleteMessageId = null; } };
+    window.deleteMessage = async function(id) { if (!currentDmRef || !confirm("Delete this message completely?")) return; await currentDmRef.child(id).remove(); };
+
+    window.startReply = function(id, sender, text) { currentMode = "reply"; activeReplyData = { sender, text }; document.getElementById('mode-banner-text').textContent = `Reply to @${sender}: "${text.length > 25 ? text.substring(0, 25) + '...' : text}"`; document.getElementById('mode-banner').classList.add('show'); document.getElementById('send-btn').textContent = t('send'); document.getElementById('send-btn').removeAttribute('data-editing'); document.getElementById('msg-input').focus(); };
+    window.startEdit = function(id, text) { currentMode = "edit"; editingMessageId = id; document.getElementById('mode-banner-text').textContent = `Editing message`; document.getElementById('mode-banner').classList.add('show'); document.getElementById('msg-input').value = text; document.getElementById('send-btn').textContent = t('update'); document.getElementById('send-btn').dataset.editing = "true"; document.getElementById('msg-input').focus(); };
+    window.cancelMode = function() { currentMode = "normal"; activeReplyData = null; editingMessageId = null; document.getElementById('mode-banner').classList.remove('show'); document.getElementById('send-btn').textContent = t('send'); document.getElementById('send-btn').removeAttribute('data-editing'); document.getElementById('msg-input').value = ''; attachedFileBase64 = null; document.getElementById('msg-input').placeholder = t('placeholder'); };
+
+    window.addEventListener('DOMContentLoaded', async () => {
+      try {
+        await auth.signInAnonymously(); await setupBotAccount();
+        const savedUser = localStorage.getItem('bunker_my_username'); const savedPriv = localStorage.getItem('bunker_my_privkey'); const savedPub = localStorage.getItem('bunker_my_pubkey');
+        if (savedUser && savedPriv) {
+          myUsername = savedUser; myKeyPair = { privateKey: await importPrivateKey(savedPriv), publicKey: savedPub ? await importPublicKey(savedPub) : null };
+          myAvatarBase64 = localStorage.getItem(`bunker_avatar_${myUsername}`) || null;
+          loadSettingsFromLocalStorage(); updateMyHeaderDisplay(); setupPresence(); listenUserStatuses(); listenInbox();
+        } else { document.getElementById('login-modal').style.display = 'flex'; }
+      } catch (e) {}
+    });
+
+    document.getElementById('login-btn').addEventListener('click', async () => {
+      try {
+        const val = document.getElementById('my-username-input').value.trim();
+        if (!val) return alert("Please enter a username"); if (val === BOT_USERNAME) return alert("This ID is reserved for the system");
+        const snap = await db.ref(`users/${val}`).once('value'); if (snap.exists()) return alert("This ID is already taken. Please choose another.");
+        const uid = auth.currentUser ? auth.currentUser.uid : null;
+        myKeyPair = await generateKeys(); const pubB64 = await exportKey(myKeyPair.publicKey, "spki"); const privB64 = await exportKey(myKeyPair.privateKey, "pkcs8");
+        await db.ref(`users/${val}`).set({ publicKey: pubB64, avatar: null, uid: uid });
+        myUsername = val; myAvatarBase64 = null;
+        localStorage.setItem('bunker_my_username', myUsername); localStorage.setItem('bunker_my_privkey', privB64); localStorage.setItem('bunker_my_pubkey', pubB64);
+        document.getElementById('login-modal').style.display = 'none';
+        loadSettingsFromLocalStorage(); updateMyHeaderDisplay(); setupPresence(); listenUserStatuses(); listenInbox();
+      } catch (e) { alert("Registration error: " + (e.message || e)); }
+    });
+
+    document.getElementById('add-dm-btn').addEventListener('click', () => {
+      const target = document.getElementById('target-user-input').value.trim();
+      if (!target || target === myUsername) return alert("Please enter a valid target ID");
+      openChatWith(target); document.getElementById('target-user-input').value = '';
+    });
+    document.getElementById('back-btn').addEventListener('click', () => { document.getElementById('app-container').classList.remove('mobile-chat-active'); });
+
+    document.getElementById('send-btn').addEventListener('click', async () => {
+      const input = document.getElementById('msg-input'); const text = input.value.trim(); const isOneTime = document.getElementById('onetime-checkbox').checked;
+      if ((!text && !attachedFileBase64) || !currentDmRef || !activeSharedKey) return;
+      const now = new Date(); const timeStr = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
+      const timestamp = Date.now(); const roomId = [myUsername, activeTargetUser].sort().join('___');
+
+      try {
+        if (currentMode === "edit" && editingMessageId) {
+          const snap = await currentDmRef.child(editingMessageId).once('value');
+          if (snap.exists()) {
+            const oldJson = JSON.parse(await decryptText(snap.val().ciphertext, activeSharedKey));
+            const updatedPayload = JSON.stringify({ ...oldJson, text: text, edited: true });
+            const newEncrypted = await encryptText(updatedPayload, activeSharedKey);
+            await currentDmRef.child(editingMessageId).set({ ciphertext: newEncrypted });
+          }
+        } else {
+          const payloadObj = { sender: myUsername, senderAvatar: myAvatarBase64 || null, text: text, file: attachedFileBase64 || null, time: timeStr, timestamp: timestamp, expiry: currentTimerMs, onetime: isOneTime, edited: false };
+          if (currentMode === "reply" && activeReplyData) payloadObj.replyTo = activeReplyData;
+          const encrypted = await encryptText(JSON.stringify(payloadObj), activeSharedKey);
+          await currentDmRef.push({ ciphertext: encrypted });
+          if (activeTargetUser === BOT_USERNAME) { triggerBotReply(roomId, text || '[Image]', isOneTime); }
+          else { try { await db.ref(`users/${activeTargetUser}/inbox/${myUsername}`).set(true); } catch (e) {} }
+        }
+        document.getElementById('onetime-checkbox').checked = false; cancelMode();
+      } catch (e) { alert("Send failed: " + (e.message || e)); }
+    });
+  </script>
+</body>
+</html>
