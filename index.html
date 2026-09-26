@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <title>BUNKER // E2EE TACTICAL MESSENGER</title>
+  <link rel="manifest" href="manifest.json">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div id="app-container">
+
+    <!-- ヘッダー -->
+    <header class="app-header">
+      <div class="header-left">
+        <span class="sys-badge">[SEC_LEVEL_3]</span>
+        <h1 class="logo">BUNKER // SYSTEM_HUD</h1>
+      </div>
+      <div class="header-right">
+        <button id="open-settings-btn" class="btn btn-hud">
+          <span data-i18n="settings">[SET] SETTINGS</span>
+        </button>
+      </div>
+    </header>
+
+    <!-- メインレイアウト -->
+    <main class="main-layout">
+
+      <!-- サイドバー -->
+      <aside class="sidebar">
+        <div class="sidebar-header">
+          <span data-i18n="rooms">[CHANNELS]</span>
+        </div>
+        <ul id="room-list" class="room-list">
+          <li class="room-item active" data-room-id="global-room">
+            [FREQ_01] GLOBAL_NET
+          </li>
+        </ul>
+
+        <!-- Botセクション -->
+        <div id="bot-section" class="bot-section hidden">
+          <div class="sidebar-header">
+            <span>[AUTOMATED_UNITS]</span>
+          </div>
+          <ul id="bot-list" class="room-list">
+            <li class="room-item" data-room-id="bot-room">
+              [UNIT_01] BUNKER_BOT
+            </li>
+          </ul>
+        </div>
+
+        <div class="status-panel">
+          <div class="status-line"><span class="label">PADDING:</span> <span class="val green">512B_FIXED</span></div>
+          <div class="status-line"><span class="label">CIPHER:</span> <span class="val green">AES-256-GCM</span></div>
+        </div>
+      </aside>
+
+      <!-- チャットエリア -->
+      <section class="chat-area">
+        <div class="chat-header">
+          <div class="chat-title-info">
+            <h2 id="current-room-name">[FREQ_01] GLOBAL_NET</h2>
+            <span class="security-badge">[E2EE_ENCRYPTED]</span>
+          </div>
+        </div>
+
+        <div id="messages-container" class="messages-container">
+          <!-- メッセージ表示エリア -->
+        </div>
+
+        <!-- 入力フォーム -->
+        <form id="message-form" class="message-form">
+          <input 
+            type="text" 
+            id="message-input" 
+            placeholder="Type encrypted msg or /cmd (/help)..." 
+            autocomplete="off" 
+            required
+          >
+          <button type="submit" class="btn btn-primary" data-i18n="send">[SEND]</button>
+        </form>
+      </section>
+
+    </main>
+  </div>
+
+  <!-- アカウント設定モーダル -->
+  <div id="settings-modal" class="modal-overlay hidden">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h2 data-i18n="accountSettings">[SYS_CONFIG] CONFIGURATION</h2>
+        <button id="close-settings-btn" class="close-btn">[X]</button>
+      </div>
+
+      <div class="modal-body">
+        <!-- アバター設定 -->
+        <div class="avatar-preview-container">
+          <img id="settings-avatar-preview" src="https://via.placeholder.com/80/0f0/000?text=USER" alt="Avatar" class="avatar-img">
+        </div>
+        <div class="form-group">
+          <label data-i18n="avatarUrl">AVATAR_IMAGE_URL</label>
+          <input type="url" id="settings-avatar-url" placeholder="https://example.com/icon.png">
+        </div>
+
+        <!-- 言語設定 -->
+        <div class="form-group">
+          <label data-i18n="language">LANGUAGE (UI_LANG)</label>
+          <select id="settings-language">
+            <option value="ja">日本語 (JAPANESE)</option>
+            <option value="en">ENGLISH</option>
+            <option value="ru">РУССКИЙ (RUSSIAN)</option>
+          </select>
+        </div>
+
+        <!-- Bot表示切替 -->
+        <div class="form-group checkbox-group">
+          <label>
+            <input type="checkbox" id="settings-show-bot">
+            <span data-i18n="showBot">SHOW_AUTOMATED_BOTS</span>
+          </label>
+        </div>
+
+        <!-- メッセージ削除タイマー -->
+        <div class="form-group">
+          <label data-i18n="autoDeleteTime">MESSAGE_AUTO_PURGE_INTERVAL</label>
+          <select id="settings-auto-delete">
+            <option value="15">15 MINS</option>
+            <option value="60">1 HOUR</option>
+            <option value="120" selected>2 HOURS (DEFAULT)</option>
+            <option value="1440">24 HOURS</option>
+            <option value="0">DISABLED</option>
+          </select>
+        </div>
+
+        <!-- バンカー概要 -->
+        <div class="bunker-info-box">
+          <h4 data-i18n="bunkerTitle">[SPEC_OVERVIEW] BUNKER PROTOCOL</h4>
+          <p data-i18n="bunkerDesc">
+            Client-side E2EE (ECDH P-256 + AES-GCM). Packet padding enforces fixed 512-byte block sizing to nullify traffic payload analysis across all devices.
+          </p>
+        </div>
+
+        <!-- 鍵管理（インポート / エクスポート） -->
+        <div class="form-group">
+          <label data-i18n="keyBackup">KEY_PAIR_BACKUP_MANAGEMENT</label>
+          <div class="btn-group-row">
+            <button id="export-key-btn" type="button" class="btn btn-secondary" data-i18n="exportKey">
+              [EXP] EXPORT_KEY (.JSON)
+            </button>
+            <label for="import-key-file" class="btn btn-secondary file-label">
+              [IMP] IMPORT_KEY (.JSON)
+            </label>
+            <input type="file" id="import-key-file" accept=".json" class="hidden">
+          </div>
+        </div>
+
+        <button id="save-settings-btn" type="button" class="btn btn-primary" data-i18n="save">[SAVE] APPLY_SETTINGS</button>
+
+        <hr class="divider">
+
+        <div class="danger-zone">
+          <button id="logout-btn" type="button" class="btn btn-danger" data-i18n="logout">[TERMINATE] LOGOUT</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="app.js"></script>
+</body>
+</html>
