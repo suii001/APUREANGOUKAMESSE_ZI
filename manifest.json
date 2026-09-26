@@ -1,0 +1,20 @@
+{
+  "name": "BUNKER // E2EE MESSENGER",
+  "short_name": "BUNKER",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#0a0b0d",
+  "theme_color": "#0a0b0d",
+  "icons": [
+    {
+      "src": "https://via.placeholder.com/192/00ff66/000000?text=BUNKER",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "https://via.placeholder.com/512/00ff66/000000?text=BUNKER",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}
